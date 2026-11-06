@@ -14,7 +14,5 @@ nltk
 emoji
 wordsegment
 ftfy
-# Optional: lets the demo read captions in pictures
-rapidocr_onnxruntime
 # Only needed to run the notebooks outside Kaggle
 jupyter

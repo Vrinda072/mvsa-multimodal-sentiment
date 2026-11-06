@@ -8,21 +8,10 @@ import os
 
 import numpy as np
 
-from mvsa import ocr
 from mvsa.text import ftfy, clean_text
 
 DEFAULT_MODEL = os.path.join(os.path.dirname(__file__), "..", "..", "results", "model", "final_model.npz")
 EMPTY_PLACEHOLDER = "no text"   # the same placeholder that training used for empty captions
-
-
-def _read_bytes(image):
-    """Get an image's bytes from a path or a file-like object, leaving a file-like object ready to read again."""
-    if hasattr(image, "read"):
-        data = image.read()
-        image.seek(0)
-        return data
-    with open(image, "rb") as f:
-        return f.read()
 
 
 def softmax(logits):
@@ -96,23 +85,15 @@ class SentimentModel:
         out = out if torch.is_tensor(out) else out.pooler_output
         return torch.nn.functional.normalize(out, dim=-1).cpu().numpy()
 
-    def predict(self, text=None, image_path=None, read_caption=False):
+    def predict(self, text=None, image_path=None):
         """Return the predicted label, its score and the probability of every class for one post.
 
-        image_path can be a path or a file-like object. With read_caption=True, a post with no text
-        uses any caption found in the picture. If the text reader isn't installed, the picture is used alone.
+        image_path can be a path or a file-like object.
         """
-        caption_read, ocr_missing = None, False
-        if read_caption and text is None and image_path is not None:
-            ocr_missing = not ocr.is_available()
-            if not ocr_missing:
-                caption_read = ocr.read_caption(_read_bytes(image_path))
-                text = caption_read
         text_embedding = self.embed_text(text) if text is not None else None
         image_embedding = self.embed_image(image_path) if image_path is not None else None
         proba = self.proba_from_embeddings(text_embedding, image_embedding)[0]
         best = int(proba.argmax())
         return {"label": self.labels[best], "score": float(proba[best]),
                 "probabilities": {l: float(v) for l, v in zip(self.labels, proba)},
-                "used": [name for name, given in (("text", text), ("image", image_path)) if given is not None],
-                "caption_read": caption_read, "ocr_missing": ocr_missing}
+                "used": [name for name, given in (("text", text), ("image", image_path)) if given is not None]}

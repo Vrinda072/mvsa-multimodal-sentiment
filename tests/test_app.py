@@ -13,7 +13,7 @@ from server import run_prediction  # noqa: E402
 
 
 class FakeModel:
-    def predict(self, text, image, read_caption=False):
+    def predict(self, text, image):
         return {"text": text, "has_image": image is not None}
 
 
