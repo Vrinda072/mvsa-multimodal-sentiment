@@ -3,10 +3,11 @@
 Usage:
   python scripts/predict.py --text "What a great day" --image photo.jpg
   python scripts/predict.py --text "What a great day"
-  python scripts/predict.py --image photo.jpg
+  python scripts/predict.py --image picture_with_caption.jpg
 
-Giving both a text and an image uses the selected late-fusion model. Giving only one uses that modality's
-model alone, which scored lower on the test set (macro-F1 0.518 for text and 0.561 for image, against 0.603).
+Giving both a text and an image uses the selected late-fusion model. With only an image, any caption found in the
+picture is used as the text, if the optional text reader is installed. Otherwise, the model for the one input
+is used alone, which scored lower on the test set (macro-F1 0.518 for text and 0.561 for image, against 0.603).
 """
 import argparse
 import os
@@ -27,7 +28,11 @@ def main():
     if args.image is not None and not os.path.isfile(args.image):
         parser.error(f"image not found: {args.image}")
 
-    result = SentimentModel().predict(args.text, args.image)
+    result = SentimentModel().predict(args.text, args.image, read_caption=True)
+    if result["ocr_missing"]:
+        print("Note: to read captions in pictures, run: python -m pip install rapidocr_onnxruntime")
+    elif args.text is None:
+        print(f"Caption:    {result['caption_read'] or '(none found in the picture)'}")
     print(f"Prediction: {result['label']}")
     print(f"Score:      {result['score']:.3f}")
     print(f"Used:       {' and '.join(result['used'])}")
