@@ -27,14 +27,41 @@ This project classifies Twitter text-image posts as negative, neutral or positiv
 │       └── 03_bias_variance_and_regularisation.ipynb
 ├── results/
 │   ├── figures/                     charts of the results
-│   └── metrics/                     saved scores and settings from the full run
+│   ├── metrics/                     saved scores and settings from the full run
+│   └── model/                       the saved final model
 ├── scripts/
+│   ├── predict.py                   predicts the sentiment of a new post
 │   ├── run_all.sh                   runs all six notebooks in order
+│   ├── train_final_model.py         retrains and saves the final model
 │   └── make_figures.py              redraws the figures from the saved metrics
 ├── src/mvsa/                        code shared by the notebooks
 ├── tests/                           unit tests, smoke test and synthetic data
 └── requirements.txt
 ```
+
+## Try it on a new post
+
+The final model is saved in `results/model/`, so you can classify a post that isn't in the dataset without downloading the dataset or retraining. Install the dependencies below, then give it a text, an image, or both:
+
+```bash
+python scripts/predict.py --text "What a great day" --image photo.jpg
+```
+
+For example, `python scripts/predict.py --text "I love this so much, best day ever!"` prints:
+
+```text
+Prediction: positive
+Score:      0.933
+Used:       text
+All classes:
+  positive  0.933
+  neutral   0.038
+  negative  0.029
+```
+
+The score is the model's probability for the predicted class, from 0 to 1. A high score is not a guarantee: the model is correct on about 70% of test posts, and it often misses neutral (for example, it labels the plain sentence "The meeting is at 3pm in room 204" positive, with a score of 0.63). Give both a text and an image where you can. That is the setup that was selected and evaluated, and single-modality predictions scored lower on the test set.
+
+The first run downloads CLIP (about 600 MB), so it needs internet access.
 
 ## How to run
 
@@ -97,6 +124,8 @@ Running the pipeline creates these folders:
 | `runs/preprocessed/` | Clean posts, features for each split, and the fitted TF-IDF vectoriser and scaler |
 | `runs/models/` | Scores, tuned settings, the chosen model's details and the bias-variance figure |
 | `runs/interim/` | Results passed from one notebook to the next |
+
+To rebuild the saved model from your run, use `python scripts/train_final_model.py runs/preprocessed`.
 
 Compare your run with these values. MLP scores can vary between environments.
 

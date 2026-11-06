@@ -67,6 +67,12 @@ Only the MLP differed. Its tuned late-fusion weight was 0.3 rather than 0.5, whi
 
 The code was the same in both runs, but the model training ran on a CPU machine the first time and a GPU machine the second. That is the likely cause, because MLP training can be sensitive to the hardware, though this wasn't tested separately.
 
+## Predicting new posts
+
+`scripts/predict.py` uses the saved final model in `results/model/`. On the test set, that saved model gives the same prediction as the full Kaggle run for all 447 posts, with 0.603 macro-F1 and 0.696 accuracy. Its text-cleaning code also reproduces the cleaned text of all 4,839 posts.
+
+The checks on new text used CLIP on a different machine, whose text embeddings matched the Kaggle ones on the 40 test posts compared. The same comparison wasn't run for images, because the dataset's images weren't available on that machine, so image predictions were only tested for running correctly.
+
 ## Where to find each result
 
 | Result | Notebook in `notebooks/02_modeling/` |
