@@ -59,6 +59,14 @@ The chosen `C = 0.01` is the strongest value in the tuning grid. Late fusion rea
 
 The top validation scores differ by only 0.006 on 446 posts, and no confidence intervals were computed. The McNemar tests, gate coefficients, confusion matrix and robustness results each use a single seed.
 
+## Reproducibility
+
+The six notebooks were rerun in order on the full dataset and compared with the results above. The preprocessing counts, the chosen model and its scores, and every logistic regression, linear SVM and random forest score matched exactly.
+
+Only the MLP differed. Its tuned late-fusion weight was 0.3 rather than 0.5, which moved MLP late fusion from 0.632 to 0.618 test macro-F1. Its other macro-F1 scores moved by 0.002 or less, and MLP early + meta did not change at 3 decimal places. The bias-variance curve moved by at most 0.003, at `C` of 10 or more.
+
+The code was the same in both runs, but the model training ran on a CPU machine the first time and a GPU machine the second. That is the likely cause, because MLP training can be sensitive to the hardware, though this wasn't tested separately.
+
 ## Where to find each result
 
 | Result | Notebook in `notebooks/02_modeling/` |
