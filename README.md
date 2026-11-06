@@ -2,111 +2,113 @@
 
 BITS F464 Machine Learning project.
 
-The project classifies Twitter text-image posts as negative, neutral or positive. It compares four classifiers and several ways of combining text and image, all on frozen CLIP ViT-B/32 embeddings.
+This project classifies Twitter text-image posts as negative, neutral or positive. It compares four classifiers and several ways of combining text and image, all on frozen CLIP ViT-B/32 embeddings, and tests a proposed fusion method that uses how much the text and image agree.
 
-| File | What it does |
-|---|---|
-| `notebooks/mvsa_preprocessing.ipynb` | Cleans the data, derives labels, splits it 8:1:1 and builds the features |
-| `notebooks/mvsa_model_design.ipynb` | Trains, tunes and evaluates the models, using the preprocessing output |
-| `results/bias_variance_curve.png` | Bias-variance figure from the full run |
-| `requirements.txt` | Python dependencies |
+**Main result:** logistic regression with late fusion was selected by validation score and reaches 0.603 macro-F1 and 0.696 accuracy on the test set, compared with 0.504 and 0.622 for the baseline. The proposed gated fusion did not beat early fusion. See [docs/results.md](docs/results.md).
 
-Both notebooks include the saved outputs from their full Kaggle runs, so you can read the results without rerunning them.
+![Test macro-F1 for every classifier and fusion setup](results/figures/03_model_comparison.png)
 
-## Dataset
+## Project structure
 
-The dataset is not included in this repository because of its size. Download MVSA-Single from Kaggle: [vincemarcs/mvsasingle](https://www.kaggle.com/datasets/vincemarcs/mvsasingle). It should contain `labelResultAll.txt` and a `data/` folder with one `.txt` and one `.jpg` file per post.
+```text
+├── data/
+│   └── README.md                    how to download the dataset
+├── docs/
+│   ├── methodology.md               preprocessing, training and evaluation steps
+│   └── results.md                   findings, with figures
+├── notebooks/
+│   ├── 01_preprocessing/
+│   │   ├── 01_data_cleaning_and_labels.ipynb
+│   │   ├── 02_train_val_test_split.ipynb
+│   │   └── 03_feature_engineering.ipynb
+│   └── 02_modeling/
+│       ├── 01_training_and_model_selection.ipynb
+│       ├── 02_significance_and_robustness.ipynb
+│       └── 03_bias_variance_and_regularisation.ipynb
+├── results/
+│   ├── figures/                     charts of the results
+│   └── metrics/                     saved scores and settings from the full run
+├── scripts/
+│   ├── run_all.sh                   runs all six notebooks in order
+│   └── make_figures.py              redraws the figures from the saved metrics
+├── src/mvsa/                        code shared by the notebooks
+├── tests/                           unit tests, smoke test and synthetic data
+└── requirements.txt
+```
 
 ## How to run
 
-Run the preprocessing notebook first, because the model notebook uses its output.
+You can read the notebooks without running anything, because they include saved outputs. See [How the saved outputs were produced](#how-the-saved-outputs-were-produced).
 
-### On Kaggle (recommended)
+### Dataset
 
-These are the settings used for the results below.
-
-1. **Preprocessing**
-   1. Create a notebook and choose **File > Import Notebook**, then select `mvsa_preprocessing.ipynb`.
-   2. Choose **Add Input** and add `vincemarcs/mvsasingle`.
-   3. In **Settings**, set **Accelerator** to GPU and turn **Internet** on.
-   4. Choose **Save Version > Save & Run All**. This took about 4 minutes on a T4 GPU.
-2. **Save the output as a dataset:** open the saved version's **Output** tab and choose **New Dataset**.
-3. **Models**
-   1. Import `mvsa_model_design.ipynb` into a new notebook.
-   2. Choose **Add Input** and add the dataset from step 2. The notebook finds the `preprocessed/` folder by itself.
-   3. Choose **Save Version > Save & Run All**. No GPU is needed. All five seeds took about 30 minutes on CPU.
-
-A warning about a missing `HF_TOKEN` is harmless. CLIP still downloads.
-
-For a faster test with one seed, add this as the first cell of the model notebook:
-
-```python
-import os
-os.environ["MVSA_QUICK"] = "1"
-```
+Follow [data/README.md](data/README.md) to download MVSA-Single into `data/raw/`.
 
 ### On your own computer
 
-Python 3.10 or newer is needed. Run these commands from the repository folder, replacing the dataset path with your own:
+Python 3.10 or newer is needed. From the repository folder:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-
-export MVSA_ROOT=/path/to/MVSA_Single
-export MVSA_OUT="$PWD/preprocessed"
-export MVSA_PRE="$PWD/preprocessed"
-export MVSA_MODEL_OUT="$PWD/models"
-
-jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=-1 notebooks/mvsa_preprocessing.ipynb
-jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=-1 notebooks/mvsa_model_design.ipynb
+bash scripts/run_all.sh
 ```
 
-The preprocessing notebook needs internet access to download CLIP. Without a GPU, CLIP embedding can take 20 minutes or more.
+To read the dataset from another folder, use `MVSA_ROOT=/path/to/MVSA_Single bash scripts/run_all.sh`.
+
+The notebooks in the repository are not changed. Executed copies and all generated files go to `runs/`. Downloading CLIP needs internet access. Without a GPU, CLIP embedding can take 20 minutes or more, and all five seeds take about 30 minutes more.
+
+### On Kaggle
+
+1. Upload this repository's ZIP as a new Kaggle dataset.
+2. Create a notebook and add two inputs: that dataset and `vincemarcs/mvsasingle`.
+3. In **Settings**, set **Accelerator** to GPU and turn **Internet** on.
+4. Run this in a cell:
+
+```python
+import glob
+script = glob.glob("/kaggle/input/**/scripts/run_all.sh", recursive=True)[0]
+!bash {script}
+```
+
+Results go to `/kaggle/working`. A warning about a missing `HF_TOKEN` is harmless.
+
+### Quick checks
+
+The smoke test runs the whole pipeline in a few minutes on synthetic data, with one seed and a tiny CLIP model. Its scores mean nothing.
+
+```bash
+python -m unittest discover tests
+bash tests/smoke_test.sh
+```
 
 ## Dependencies
 
-Python packages are listed in `requirements.txt`. The results below came from Kaggle's "Latest Container Image" environment, so versions are not pinned. `emoji`, `wordsegment`, `ftfy` and `nltk` are optional: without them the preprocessing notebook uses simpler fallbacks or skips VADER scores, which can change results slightly.
+Python packages are listed in `requirements.txt`. Versions aren't pinned, because the results came from Kaggle's "Latest Container Image" environment. `emoji`, `wordsegment`, `ftfy` and `nltk` are optional: without them the code uses simpler fallbacks or skips VADER scores, which can change results slightly.
 
 ## Expected outputs
 
-### Preprocessing
+Running the pipeline creates these folders:
 
-The notebook writes a `preprocessed/` folder:
+| Folder | Contents |
+|---|---|
+| `runs/executed/` | Executed copies of all six notebooks |
+| `runs/preprocessed/` | Clean posts, features for each split, and the fitted TF-IDF vectoriser and scaler |
+| `runs/models/` | Scores, tuned settings, the chosen model's details and the bias-variance figure |
+| `runs/interim/` | Results passed from one notebook to the next |
 
-- `posts_preprocessed.csv` and `preprocessing_report.json`
-- `features/`: IDs, CLIP embeddings, TF-IDF, colour histograms and engineered features for each split
-- `artifacts/`: the fitted TF-IDF vectoriser and scaler
-- `figures/`: a plot of the feature scaling
+Compare your run with these values. Random forest and MLP scores can vary slightly between environments.
 
 | Check | Expected value |
 |---|---|
 | Posts after removing duplicates | 4,839 of 4,869 |
 | Agreement / soft mismatch / hard mismatch | 2,576 / 1,908 / 355 |
-| Train / validation / test | 3,591 / 446 / 447, with the 355 hard-mismatch posts held out |
-
-### Models
-
-The notebook prints its results and writes a `models/` folder:
-
-| File | Contents |
-|---|---|
-| `all_runs.csv`, `summary_mean_over_seeds.csv` | Every metric for each model, per seed and averaged |
-| `per_class_metrics.csv` | Precision, recall and F1 per class for the chosen model |
-| `tuned_hyperparameters.json`, `chosen_model.json` | Tuned settings and the selected model |
-| `robustness_missing_modality.csv` | Scores with the text or image masked |
-| `gate_coefficients.csv` | What the gated fusion model learned |
-| `bias_variance_curve.csv`, `bias_variance_curve.png` | Training and validation macro-F1 across regularisation strengths |
-
-The model is chosen by validation macro-F1, not test score. The full run selects **logistic regression with late fusion**:
-
-| Metric | Value |
-|---|---|
-| Validation macro-F1 (used for selection) | 0.619 |
-| Test macro-F1 | 0.603 |
-| Test accuracy | 0.696 |
-| Macro precision / macro recall | 0.591 / 0.637 |
+| Train / validation / test | 3,591 / 446 / 447 |
+| Chosen model | Logistic regression with late fusion |
+| Validation macro-F1 | 0.619 |
+| Test macro-F1 / accuracy | 0.603 / 0.696 |
+| Test macro-precision / macro-recall | 0.591 / 0.637 |
 
 | Class | Precision | Recall | F1 | Test posts |
 |---|---|---|---|---|
@@ -114,4 +116,8 @@ The model is chosen by validation macro-F1, not test score. The full run selects
 | Neutral | 0.275 | 0.487 | 0.352 | 39 |
 | Positive | 0.846 | 0.723 | 0.780 | 274 |
 
-For comparison, the TF-IDF and colour-histogram baseline scores 0.504 macro-F1 and 0.622 accuracy. Random forest and MLP scores can vary slightly between environments.
+## How the saved outputs were produced
+
+The outputs in the notebooks, and everything in `results/metrics/`, come from full runs on Kaggle: GPU T4 x2 for preprocessing (about 4 minutes) and CPU for the models (about 30 minutes). Those runs used one preprocessing notebook and one model notebook, which were later split into the six here.
+
+Each cell's output is the one its code produced in those runs. The setup and save cells added by the split show no output, because they weren't part of them. The split pipeline was checked on synthetic data, where it produced the same scores and data files as the original notebooks. `scripts/run_all.sh` has been run on synthetic data, but not yet on Kaggle or the full dataset.
