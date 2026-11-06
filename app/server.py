@@ -40,7 +40,7 @@ def run_prediction(model, payload):
     if text is None and image is None:
         raise ValueError("Add a picture, a caption, or both.")
     try:
-        return model.predict(text, image, read_caption=True)
+        return model.predict(text, image)
     except OSError:
         raise ValueError(UNREADABLE_IMAGE)
 

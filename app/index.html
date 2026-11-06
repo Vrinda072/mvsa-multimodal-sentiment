@@ -42,7 +42,6 @@
   .eyebrow { margin: 0; color: var(--muted); font-size: 14px; }
   #label { margin: 0; font-size: 36px; line-height: 1.2; font-weight: 700; text-transform: capitalize; }
   #score { margin: 2px 0 20px; color: var(--muted); }
-  #caption { display: none; margin: 0 0 20px; padding: 10px 12px; background: var(--surface); border-radius: 8px; font-size: 14px; }
   .row { display: grid; grid-template-columns: 76px 1fr 52px; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; text-transform: capitalize; }
   .row.top { font-weight: 600; }
   .track { height: 10px; background: var(--track); border-radius: 4px; overflow: hidden; }
@@ -55,7 +54,7 @@
 <body>
 <main>
   <h1>Multimodal Sentiment Demo</h1>
-  <p class="intro">Add a picture, including one with a caption in it, to see whether the post reads as positive, negative or neutral. Everything runs on this computer.</p>
+  <p class="intro">Add a picture and its caption to see whether the post reads as positive, negative or neutral. Everything runs on this computer.</p>
 
   <form id="form">
     <div class="field">
@@ -68,8 +67,8 @@
       <button id="remove" type="button">Remove picture</button>
     </div>
     <div class="field">
-      <label for="text">Caption <span class="optional">(optional)</span></label>
-      <textarea id="text" placeholder="Leave blank to use any caption in the picture"></textarea>
+      <label for="text">Caption</label>
+      <textarea id="text" placeholder="What does the post say?"></textarea>
     </div>
     <button id="predict" type="submit">Predict sentiment</button>
     <p id="error" role="alert"></p>
@@ -79,7 +78,6 @@
     <p class="eyebrow">Prediction</p>
     <p id="label"></p>
     <p id="score"></p>
-    <p id="caption"></p>
     <div id="bars"></div>
     <p id="note"></p>
   </section>
@@ -140,14 +138,6 @@
       row.append(label, track, number);
       return row;
     }));
-    const fromPicture = result.caption_read !== null;
-    const noCaption = !$("text").value.trim() && result.used[0] === "image" && result.used.length === 1;
-    $("caption").textContent = fromPicture
-      ? `Caption read from the picture: "${result.caption_read}". If this is wrong, type the right caption above and predict again.`
-      : result.ocr_missing
-        ? "Captions in pictures weren't read, because the text reader isn't installed. To add it, run: python3 -m pip install rapidocr_onnxruntime"
-        : noCaption ? "No caption was found in the picture." : "";
-    $("caption").style.display = $("caption").textContent ? "block" : "none";
     const single = result.used.length === 1
       ? ` This used only the ${result.used[0]}, which scored lower in testing than using both.` : "";
     $("note").textContent = `The score is the model's probability for this class, not a guarantee. The model is right on about 70% of test posts, and neutral is its weakest class.${single}`;
