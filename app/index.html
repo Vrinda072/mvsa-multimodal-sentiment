@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multimodal Sentiment Demo</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --surface: #fcfcfb; --card: #ffffff; --ink: #0b0b0b; --muted: #52514e; --line: #d9d8d3;
+    --track: #e9e8e4; --accent: #2a78d6; --accent-ink: #ffffff; --bar-other: #8f8e88; --error: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface: #1a1a19; --card: #242423; --ink: #f0efec; --muted: #c3c2b7; --line: #45443f;
+      --track: #383733; --accent: #3987e5; --accent-ink: #ffffff; --bar-other: #8f8e88; --error: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface); color: var(--ink);
+         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 40px 20px 56px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 0 0 8px; }
+  .intro { color: var(--muted); margin: 0 0 28px; }
+  label, .field-label { display: block; font-weight: 600; margin-bottom: 8px; }
+  .field { margin-bottom: 24px; }
+  .optional { color: var(--muted); font-weight: 400; }
+  #drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 180px;
+          padding: 20px; text-align: center; background: var(--card); border: 2px dashed var(--line); border-radius: 12px; cursor: pointer; }
+  #drop:hover, #drop.over, #drop:focus-visible { border-color: var(--accent); }
+  #drop:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #drop .hint { color: var(--muted); font-size: 14px; }
+  #preview { display: none; max-width: 100%; max-height: 300px; border-radius: 8px; }
+  #remove { display: none; margin-top: 8px; padding: 0; background: none; border: 0; color: var(--accent); font: inherit; font-size: 14px; cursor: pointer; text-decoration: underline; }
+  textarea { width: 100%; min-height: 84px; padding: 12px; resize: vertical; color: var(--ink); background: var(--card);
+             border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+  #predict { width: 100%; min-height: 48px; color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 8px;
+             font: inherit; font-weight: 600; cursor: pointer; }
+  #predict:disabled { opacity: .6; cursor: progress; }
+  #error { display: none; margin: 16px 0 0; color: var(--error); }
+  #result { display: none; margin-top: 28px; padding: 24px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+  .eyebrow { margin: 0; color: var(--muted); font-size: 14px; }
+  #label { margin: 0; font-size: 36px; line-height: 1.2; font-weight: 700; text-transform: capitalize; }
+  #score { margin: 2px 0 20px; color: var(--muted); }
+  #caption { display: none; margin: 0 0 20px; padding: 10px 12px; background: var(--surface); border-radius: 8px; font-size: 14px; }
+  .row { display: grid; grid-template-columns: 76px 1fr 52px; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; text-transform: capitalize; }
+  .row.top { font-weight: 600; }
+  .track { height: 10px; background: var(--track); border-radius: 4px; overflow: hidden; }
+  .fill { height: 100%; background: var(--bar-other); border-radius: 4px; }
+  .row.top .fill { background: var(--accent); }
+  .value { text-align: right; font-variant-numeric: tabular-nums; }
+  #note { margin: 20px 0 0; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Multimodal Sentiment Demo</h1>
+  <p class="intro">Add a picture, including one with a caption in it, to see whether the post reads as positive, negative or neutral. Everything runs on this computer.</p>
+
+  <form id="form">
+    <div class="field">
+      <span class="field-label">Picture</span>
+      <div id="drop" tabindex="0" role="button" aria-label="Choose a picture, or drop one here">
+        <img id="preview" alt="The picture you chose">
+        <span id="prompt"><strong>Choose a picture</strong> or drop one here<br><span class="hint">JPG or PNG, under 20 MB</span></span>
+      </div>
+      <input id="file" type="file" accept="image/*" hidden>
+      <button id="remove" type="button">Remove picture</button>
+    </div>
+    <div class="field">
+      <label for="text">Caption <span class="optional">(optional)</span></label>
+      <textarea id="text" placeholder="Leave blank to use any caption in the picture"></textarea>
+    </div>
+    <button id="predict" type="submit">Predict sentiment</button>
+    <p id="error" role="alert"></p>
+  </form>
+
+  <section id="result" aria-live="polite">
+    <p class="eyebrow">Prediction</p>
+    <p id="label"></p>
+    <p id="score"></p>
+    <p id="caption"></p>
+    <div id="bars"></div>
+    <p id="note"></p>
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const MAX_BYTES = 20 * 1024 * 1024;
+  let imageData = null;
+
+  function showError(message) {
+    $("error").textContent = message;
+    $("error").style.display = message ? "block" : "none";
+  }
+
+  function clearImage() {
+    imageData = null;
+    $("file").value = "";
+    $("preview").removeAttribute("src");
+    $("preview").style.display = "none";
+    $("prompt").style.display = "";
+    $("remove").style.display = "none";
+  }
+
+  function setImage(file) {
+    if (!file) return;
+    showError("");
+    if (file.size > MAX_BYTES) return showError("That image is too large. Please use one under 20 MB.");
+    const reader = new FileReader();
+    reader.onload = () => {
+      imageData = reader.result;
+      $("preview").src = imageData;
+      $("preview").style.display = "block";
+      $("prompt").style.display = "none";
+      $("remove").style.display = "inline";
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function showResult(result) {
+    $("label").textContent = result.label;
+    $("score").textContent = `Score ${result.score.toFixed(3)}`;
+    const rows = Object.entries(result.probabilities).sort((a, b) => b[1] - a[1]);
+    $("bars").replaceChildren(...rows.map(([name, value]) => {
+      const row = document.createElement("div");
+      row.className = "row" + (name === result.label ? " top" : "");
+      const label = document.createElement("span");
+      label.textContent = name;
+      const track = document.createElement("div");
+      track.className = "track";
+      const fill = document.createElement("div");
+      fill.className = "fill";
+      fill.style.width = `${(value * 100).toFixed(1)}%`;
+      track.append(fill);
+      const number = document.createElement("span");
+      number.className = "value";
+      number.textContent = value.toFixed(3);
+      row.append(label, track, number);
+      return row;
+    }));
+    const fromPicture = result.caption_read !== null;
+    const noCaption = !$("text").value.trim() && result.used[0] === "image" && result.used.length === 1;
+    $("caption").textContent = fromPicture
+      ? `Caption read from the picture: "${result.caption_read}". If this is wrong, type the right caption above and predict again.`
+      : result.ocr_missing
+        ? "Captions in pictures weren't read, because the text reader isn't installed. To add it, run: python3 -m pip install rapidocr_onnxruntime"
+        : noCaption ? "No caption was found in the picture." : "";
+    $("caption").style.display = $("caption").textContent ? "block" : "none";
+    const single = result.used.length === 1
+      ? ` This used only the ${result.used[0]}, which scored lower in testing than using both.` : "";
+    $("note").textContent = `The score is the model's probability for this class, not a guarantee. The model is right on about 70% of test posts, and neutral is its weakest class.${single}`;
+    $("result").style.display = "block";
+    $("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  $("drop").addEventListener("click", () => $("file").click());
+  $("drop").addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); }
+  });
+  $("file").addEventListener("change", e => setImage(e.target.files[0]));
+  $("remove").addEventListener("click", clearImage);
+  ["dragover", "dragenter"].forEach(type => $("drop").addEventListener(type, e => { e.preventDefault(); $("drop").classList.add("over"); }));
+  ["dragleave", "drop"].forEach(type => $("drop").addEventListener(type, e => { e.preventDefault(); $("drop").classList.remove("over"); }));
+  $("drop").addEventListener("drop", e => setImage(e.dataTransfer.files[0]));
+
+  $("form").addEventListener("submit", async e => {
+    e.preventDefault();
+    showError("");
+    const text = $("text").value;
+    if (!imageData && !text.trim()) return showError("Add a picture, a caption, or both.");
+    $("predict").disabled = true;
+    $("predict").textContent = "Predicting...";
+    $("result").style.display = "none";
+    try {
+      const response = await fetch("/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, image: imageData }),
+      });
+      const content = await response.json();
+      if (!response.ok) throw new Error(content.error);
+      showResult(content);
+    } catch (err) {
+      showError(err instanceof TypeError ? "Couldn't reach the model. Is the app still running in Terminal?" : err.message);
+    } finally {
+      $("predict").disabled = false;
+      $("predict").textContent = "Predict sentiment";
+    }
+  });
+</script>
+</body>
+</html>
