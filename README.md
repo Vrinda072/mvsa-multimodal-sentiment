@@ -11,7 +11,7 @@ This project classifies Twitter text-image posts as negative, neutral or positiv
 ## Project structure
 
 ```text
-├── app/                             demo page for trying the model on your own pictures
+├── app/                             demo page for trying the model on your own posts
 ├── data/
 │   └── README.md                    how to download the dataset
 ├── docs/
@@ -48,12 +48,11 @@ The final model is saved in `results/model/`, so you can classify a post that is
 python app/server.py
 ```
 
-It opens in your browser. Add a picture and click **Predict sentiment**. If the picture has a caption in it, such as a meme or a screenshot of a post, the page reads the caption and shows you what it read. If it misread the caption, or the caption isn't in the picture, type it in the caption box. Everything runs on your computer, and pictures aren't saved. Press Ctrl+C in the terminal to stop it.
+It opens in your browser. Add a picture, type its caption and click **Predict sentiment**. Everything runs on your computer, and pictures aren't saved. Press Ctrl+C in the terminal to stop it.
 
 You can also use the command line:
 
 ```bash
-python scripts/predict.py --image picture_with_caption.jpg
 python scripts/predict.py --text "What a great day" --image photo.jpg
 ```
 
@@ -69,9 +68,7 @@ All classes:
   negative  0.029
 ```
 
-The score is the model's probability for the predicted class, from 0 to 1. A high score is not a guarantee: the model is correct on about 70% of test posts, and it often misses neutral (for example, it labels the plain sentence "The meeting is at 3pm in room 204" positive, with a score of 0.63). Give both a text and an image where you can. That is the setup that was selected and evaluated, and single-modality predictions scored lower on the test set.
-
-Captions read from pictures are a demo feature and weren't part of the evaluation. The model was trained and tested on posts whose text and image were separate, so its accuracy on pictures with captions in them hasn't been measured.
+The score is the model's probability for the predicted class, from 0 to 1. A high score is not a guarantee: the model is correct on about 70% of test posts, and it often misses neutral (for example, it labels the plain sentence "The meeting is at 3pm in room 204" positive, with a score of 0.63). Give both a text and an image where you can. That is the setup that was selected and evaluated, and single-modality predictions scored lower on the test set. The caption should be typed separately, because the model was trained and tested on posts whose text and image were separate. A caption inside a picture isn't read as text.
 
 The first run downloads CLIP (about 600 MB), so it needs internet access.
 
@@ -124,8 +121,7 @@ bash tests/smoke_test.sh
 
 ## Dependencies
 
-Python packages are listed in `requirements.txt`. Versions aren't pinned, because the results came from Kaggle's "Latest Container Image" environment. `emoji`, `wordsegment`, `ftfy` and `nltk` are optional: without them the code uses simpler fallbacks or skips VADER scores, which can change results slightly. `rapidocr_onnxruntime` is also optional: without it, the demo can't read captions in pictures.
-
+Python packages are listed in `requirements.txt`. Versions aren't pinned, because the results came from Kaggle's "Latest Container Image" environment. `emoji`, `wordsegment`, `ftfy` and `nltk` are optional: without them the code uses simpler fallbacks or skips VADER scores, which can change results slightly.
 ## Expected outputs
 
 Running the pipeline creates these folders:
