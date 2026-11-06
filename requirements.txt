@@ -1,0 +1,18 @@
+# Core
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+pillow
+joblib
+# CLIP embeddings
+torch
+transformers
+# Text helpers: the preprocessing notebook still runs without these, using simpler fallbacks
+nltk
+emoji
+wordsegment
+ftfy
+# Only needed to run the notebooks outside Kaggle
+jupyter
