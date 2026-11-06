@@ -1,0 +1,74 @@
+{
+ "logreg": {
+  "hp": {
+   "text": {
+    "C": 0.01
+   },
+   "image": {
+    "C": 0.01
+   },
+   "early": {
+    "C": 0.01
+   },
+   "early_meta": {
+    "C": 0.01
+   }
+  },
+  "late_w": 0.5,
+  "gate_C": 0.1
+ },
+ "linear_svm": {
+  "hp": {
+   "text": {
+    "C": 0.001
+   },
+   "image": {
+    "C": 0.001
+   },
+   "early": {
+    "C": 0.001
+   },
+   "early_meta": {
+    "C": 0.001
+   }
+  },
+  "late_w": 0.5,
+  "gate_C": 0.1
+ },
+ "random_forest": {
+  "hp": {
+   "text": {
+    "min_samples_leaf": 5
+   },
+   "image": {
+    "min_samples_leaf": 5
+   },
+   "early": {
+    "min_samples_leaf": 5
+   },
+   "early_meta": {
+    "min_samples_leaf": 5
+   }
+  },
+  "late_w": 0.0,
+  "gate_C": 0.1
+ },
+ "mlp": {
+  "hp": {
+   "text": {
+    "alpha": 0.1
+   },
+   "image": {
+    "alpha": 0.1
+   },
+   "early": {
+    "alpha": 0.001
+   },
+   "early_meta": {
+    "alpha": 0.001
+   }
+  },
+  "late_w": 0.5,
+  "gate_C": 0.1
+ }
+}

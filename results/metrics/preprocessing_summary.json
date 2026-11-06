@@ -1,0 +1,11 @@
+{
+ "posts_in_label_file": 4869,
+ "exact_duplicates_dropped": 30,
+ "posts_after_cleaning": 4839,
+ "mismatch_counts": {"agreement": 2576, "soft_mismatch": 1908, "hard_mismatch": 355},
+ "label_counts": {"positive": 2670, "negative": 1346, "neutral": 468},
+ "split_sizes": {"train": 3591, "val": 446, "test": 447, "hard": 355},
+ "train_label_counts": {"positive": 2137, "negative": 1078, "neutral": 376},
+ "captions_empty_after_cleaning": 45,
+ "tfidf_vocabulary": 5000
+}

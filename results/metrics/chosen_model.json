@@ -1,0 +1,29 @@
+{
+ "chosen_family": "logreg",
+ "chosen_setup": "late",
+ "seeds": [
+  0,
+  1,
+  2,
+  3,
+  4
+ ],
+ "config": {
+  "hp": {
+   "text": {
+    "C": 0.01
+   },
+   "image": {
+    "C": 0.01
+   },
+   "early": {
+    "C": 0.01
+   },
+   "early_meta": {
+    "C": 0.01
+   }
+  },
+  "late_w": 0.5,
+  "gate_C": 0.1
+ }
+}
