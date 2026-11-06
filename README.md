@@ -98,7 +98,7 @@ Running the pipeline creates these folders:
 | `runs/models/` | Scores, tuned settings, the chosen model's details and the bias-variance figure |
 | `runs/interim/` | Results passed from one notebook to the next |
 
-Compare your run with these values. Random forest and MLP scores can vary slightly between environments.
+Compare your run with these values. MLP scores can vary between environments.
 
 | Check | Expected value |
 |---|---|
@@ -120,4 +120,6 @@ Compare your run with these values. Random forest and MLP scores can vary slight
 
 The outputs in the notebooks, and everything in `results/metrics/`, come from full runs on Kaggle: GPU T4 x2 for preprocessing (about 4 minutes) and CPU for the models (about 30 minutes). Those runs used one preprocessing notebook and one model notebook, which were later split into the six here.
 
-Each cell's output is the one its code produced in those runs. The setup and save cells added by the split show no output, because they weren't part of them. The split pipeline was checked on synthetic data, where it produced the same scores and data files as the original notebooks. `scripts/run_all.sh` has been run on synthetic data, but not yet on Kaggle or the full dataset.
+Each cell's output is the one its code produced in those runs. The setup and save cells added by the split show no output, because they weren't part of them.
+
+The six notebooks were then run in order on the full dataset with `scripts/run_all.sh`, following the Kaggle steps above. All six finished without errors in about 28 minutes on a GPU T4 x2 machine. The results matched except for small MLP differences. See [Reproducibility](docs/results.md#reproducibility).
