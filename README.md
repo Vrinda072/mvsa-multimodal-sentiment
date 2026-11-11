@@ -49,7 +49,7 @@ The final model is saved in `results/model/`, so you can classify a post that is
 python app/server.py
 ```
 
-It opens in your browser. Add a picture, type its caption and click **Predict sentiment**. Everything runs on your computer, and pictures aren't saved. Press Ctrl+C in the terminal to stop it.
+It opens in your browser. Add a picture, type its caption and click **Predict sentiment**. The page shows the overall sentiment, what the caption and the picture each say on their own, and a warning when they point in opposite directions, which can mean sarcasm or a mixed message. With only a caption or only a picture, it judges that part by itself. Everything runs on your computer, and pictures aren't saved. Press Ctrl+C in the terminal to stop it.
 
 You can also use the command line:
 
@@ -61,15 +61,15 @@ For example, `python scripts/predict.py --text "I love this so much, best day ev
 
 ```text
 Prediction: positive
-Score:      0.933 (high confidence)
+Score:      0.753 (high confidence)
 Used:       text
 All classes:
-  positive  0.933
-  neutral   0.038
-  negative  0.029
+  positive  0.753
+  neutral   0.163
+  negative  0.083
 ```
 
-The score is the model's probability for the predicted class, from 0 to 1. It also gets a confidence level, chosen from the validation set: high (0.70 or more), where predictions were right about 84% of the time; medium (0.45 to 0.70), right about 58% to 68% of the time; and low (below 0.45), right only about 41% of the time, close to a random guess. A high score is not a guarantee: the model is correct on about 70% of test posts, and it often misses neutral (for example, it labels the plain sentence "The meeting is at 3pm in room 204" positive, with a score of 0.63). Give both a text and an image where you can. That is the setup that was selected and evaluated, and single-modality predictions scored lower on the test set. The caption should be typed separately, because the model was trained and tested on posts whose text and image were separate. A caption inside a picture isn't read as text.
+The score is the model's probability for the predicted class, from 0 to 1. It also gets a confidence level, chosen from the validation set: high (0.70 or more), where predictions were right about 84% of the time; medium (0.45 to 0.70), right about 58% to 68% of the time; and low (below 0.45), right only about 41% of the time, close to a random guess. A high score is not a guarantee: the overall model is correct on about 70% of test posts, and neutral is its weakest class. With only a caption or only a picture, the result is that part's own reading, which judges it by itself. For example, the plain sentence "The meeting is at 3pm in room 204" comes out neutral (0.592). With both, the overall result follows the dataset's rule, so a neutral caption with a happy picture counts as positive, and the page shows each part's reading alongside. The caption should be typed separately, because the model was trained and tested on posts whose text and image were separate. A caption inside a picture isn't read as text.
 
 The first run downloads CLIP (about 600 MB), so it needs internet access.
 
@@ -134,7 +134,7 @@ Running the pipeline creates these folders:
 | `runs/models/` | Scores, tuned settings, the chosen model's details and the bias-variance figure |
 | `runs/interim/` | Results passed from one notebook to the next |
 
-To rebuild the saved model from your run, use `python scripts/train_final_model.py runs/preprocessed`.
+To rebuild the saved model from your run, use `python scripts/train_final_model.py runs/preprocessed`. It also trains the separate caption and picture readings used by the demo, on each modality's own labels.
 
 Compare your run with these values. MLP scores can vary between environments.
 

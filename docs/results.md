@@ -75,6 +75,21 @@ The score and the agreement between the two separate models are useful warnings.
 
 On hard-mismatch posts, the chosen model's prediction matches the image label 51.0% of the time and the text label 41.1%.
 
+## Neutral and reading each part separately
+
+Neutral is the hardest class partly because of the labelling rule: a post is only neutral when both its text and its image are neutral. 42.7% of training and validation posts have a neutral caption, but only 24.9% of those end up neutral, because an emotional image overrules the caption. Models trained on the combined labels therefore learn that even calm captions are usually positive or negative.
+
+MVSA-Single also labels the text and image separately, so each modality's model can be trained on its own labels, using the same frozen CLIP features and logistic regression. `C = 0.001` was chosen on the validation set, and the test set was then used once. Each model is judged against its own modality's labels:
+
+| Test set | Macro-F1 | Neutral F1 | Neutral precision | Neutral recall |
+|---|---:|---:|---:|---:|
+| Text model, trained on combined labels | 0.505 | 0.346 | 0.597 | 0.243 |
+| **Text model, trained on text labels** | **0.676** | **0.657** | **0.745** | **0.587** |
+| Image model, trained on combined labels | 0.596 | 0.430 | 0.416 | 0.446 |
+| **Image model, trained on image labels** | **0.622** | **0.492** | **0.422** | **0.590** |
+
+These are a different task from the main results: they measure what each part says on its own, not the post's overall label. The demo shows them alongside the overall prediction, and uses them when only a caption or only a picture is given. A post whose two readings point in opposite directions is flagged as a possible sarcasm or mixed message. Across validation, test and hard-mismatch posts, 51.8% of flagged posts were hard mismatches, against 28.4% of all those posts, and the flag caught 37.2% of hard mismatches.
+
 ## Missing modalities
 
 ![Macro-F1 with both modalities, the image masked and the text masked](../results/figures/06_missing_modality.png)
