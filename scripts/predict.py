@@ -5,8 +5,8 @@ Usage:
   python scripts/predict.py --text "What a great day"
   python scripts/predict.py --image photo.jpg
 
-Giving both a text and an image uses the selected late-fusion model. Giving only one uses that modality's
-model alone, which scored lower on the test set (macro-F1 0.518 for text and 0.561 for image, against 0.603).
+Giving both a text and an image uses the selected late-fusion model and also shows what each part says on its own.
+Giving only one uses a model trained on that modality's own labels, which judges a caption or a picture by itself.
 """
 import argparse
 import os
@@ -34,6 +34,12 @@ def main():
     print("All classes:")
     for label, probability in sorted(result["probabilities"].items(), key=lambda item: -item[1]):
         print(f"  {label:9s} {probability:.3f}")
+    if len(result["readings"]) == 2:
+        print("What each part says on its own:")
+        for name, reading in result["readings"].items():
+            print(f"  {name:6s} {reading['label']} ({reading['score']:.3f}, {reading['confidence']} confidence)")
+        if result["conflict"]:
+            print("Note: the caption and the picture point in opposite directions, which can mean sarcasm or a mixed message.")
 
 
 if __name__ == "__main__":

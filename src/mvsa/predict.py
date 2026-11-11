@@ -41,15 +41,24 @@ class SentimentModel:
         self.clip_model = str(self.parts["clip_model"])
         self._clip = None
 
-    def _proba(self, modality, embeddings):
+    def _proba(self, modality, embeddings, prefix=""):
         """Probabilities from one modality's logistic regression, using the training-set scaling."""
-        p = self.parts
+        p, key = self.parts, f"{prefix}{modality}"
         embeddings = np.atleast_2d(embeddings)
-        expected = p[f"{modality}_mean"].shape[0]
+        expected = p[f"{key}_mean"].shape[0]
         if embeddings.shape[1] != expected:
             raise ValueError(f"Expected {expected}-dimensional {modality} embeddings, got {embeddings.shape[1]}.")
-        scaled = (embeddings - p[f"{modality}_mean"]) / p[f"{modality}_scale"]
-        return softmax(scaled @ p[f"{modality}_coef"].T + p[f"{modality}_intercept"])
+        scaled = (embeddings - p[f"{key}_mean"]) / p[f"{key}_scale"]
+        return softmax(scaled @ p[f"{key}_coef"].T + p[f"{key}_intercept"])
+
+    @property
+    def has_readings(self):
+        """True when the saved model includes the separate text and image readings."""
+        return "own_text_coef" in self.parts
+
+    def reading(self, modality, embeddings):
+        """What one modality says on its own: its model was trained on that modality's own labels."""
+        return self._proba(modality, embeddings, prefix="own_")
 
     def proba_from_embeddings(self, text=None, image=None):
         """Late fusion of both modalities. If only one is given, that modality's model is used alone."""
@@ -97,6 +106,31 @@ class SentimentModel:
         out = out if torch.is_tensor(out) else out.pooler_output
         return torch.nn.functional.normalize(out, dim=-1).cpu().numpy()
 
+    def _summary(self, proba):
+        best = int(proba.argmax())
+        return {"label": self.labels[best], "score": float(proba[best]), "confidence": confidence_level(float(proba[best])),
+                "probabilities": {l: float(v) for l, v in zip(self.labels, proba)}}
+
+    def predict_embeddings(self, text=None, image=None):
+        """Overall sentiment plus, when the model has them, what the text and the image each say.
+
+        With both inputs, the overall result comes from the evaluated late-fusion model. With one input, it is that
+        modality's own reading, because a caption or picture alone should be judged on what it says itself.
+        A conflict means one reading is positive and the other negative, as in sarcasm or mixed messages.
+        """
+        readings = {}
+        if self.has_readings:
+            for name, emb in (("text", text), ("image", image)):
+                if emb is not None:
+                    readings[name] = self._summary(self.reading(name, emb)[0])
+        if text is not None and image is not None or not readings:
+            overall = self._summary(self.proba_from_embeddings(text, image)[0])
+        else:
+            overall = next(iter(readings.values()))
+        labels = {r["label"] for r in readings.values()}
+        return {**overall, "used": [n for n, e in (("text", text), ("image", image)) if e is not None],
+                "readings": readings, "conflict": labels == {"positive", "negative"}}
+
     def predict(self, text=None, image_path=None):
         """Return the predicted label, its score and the probability of every class for one post.
 
@@ -104,8 +138,6 @@ class SentimentModel:
         """
         text_embedding = self.embed_text(text) if text is not None else None
         image_embedding = self.embed_image(image_path) if image_path is not None else None
-        proba = self.proba_from_embeddings(text_embedding, image_embedding)[0]
-        best = int(proba.argmax())
-        return {"label": self.labels[best], "score": float(proba[best]), "confidence": confidence_level(float(proba[best])),
-                "probabilities": {l: float(v) for l, v in zip(self.labels, proba)},
-                "used": [name for name, given in (("text", text), ("image", image_path)) if given is not None]}
+        if text_embedding is None and image_embedding is None:
+            raise ValueError("Give a text, an image, or both.")
+        return self.predict_embeddings(text_embedding, image_embedding)

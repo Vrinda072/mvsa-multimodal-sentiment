@@ -61,6 +61,36 @@ class PredictTests(unittest.TestCase):
         from mvsa.predict import confidence_level
         self.assertEqual([confidence_level(s) for s in (0.9, 0.70, 0.6, 0.45, 0.44)], ["high", "high", "medium", "medium", "low"])
 
+    def model_with_readings(self, text_says, image_says):
+        """A model whose separate readings always say the given labels, to test how results are combined."""
+        path = os.path.join(self.folder, f"readings_{text_says}_{image_says}.npz")
+        arrays = dict(np.load(os.path.join(self.folder, "model.npz")))
+        for name, says in (("text", text_says), ("image", image_says)):
+            arrays.update({f"own_{name}_mean": np.zeros(8), f"own_{name}_scale": np.ones(8), f"own_{name}_coef": np.zeros((3, 8)),
+                           f"own_{name}_intercept": np.eye(3)[["negative", "neutral", "positive"].index(says)] * 5})
+        np.savez(path, **arrays)
+        return SentimentModel(path)
+
+    def test_without_readings_nothing_changes(self):
+        result = self.model.predict_embeddings(self.text[:1], self.image[:1])
+        self.assertEqual((result["readings"], result["conflict"]), ({}, False))
+
+    def test_both_inputs_use_late_fusion_and_report_readings(self):
+        m = self.model_with_readings("neutral", "positive")
+        result = m.predict_embeddings(self.text[:1], self.image[:1])
+        expected = m.proba_from_embeddings(self.text[:1], self.image[:1])[0]
+        self.assertAlmostEqual(result["score"], expected.max())
+        self.assertEqual({k: v["label"] for k, v in result["readings"].items()}, {"text": "neutral", "image": "positive"})
+        self.assertFalse(result["conflict"])
+
+    def test_one_input_uses_its_own_reading(self):
+        result = self.model_with_readings("neutral", "positive").predict_embeddings(text=self.text[:1])
+        self.assertEqual((result["label"], result["used"]), ("neutral", ["text"]))
+
+    def test_opposite_readings_are_a_conflict(self):
+        result = self.model_with_readings("negative", "positive").predict_embeddings(self.text[:1], self.image[:1])
+        self.assertTrue(result["conflict"])
+
     def test_rejects_missing_input(self):
         with self.assertRaises(ValueError):
             self.model.proba_from_embeddings()
