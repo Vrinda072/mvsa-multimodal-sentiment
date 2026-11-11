@@ -1,0 +1,8 @@
+,posts,error rate
+all test posts,447,0.3042505592841163
+text and image models agree,246,0.1991869918699187
+text and image models disagree,201,0.43283582089552236
+score 0.70 or more,166,0.12650602409638553
+score below 0.45,39,0.6666666666666666
+human labels agree,253,0.24110671936758893
+soft mismatch,194,0.3865979381443299
