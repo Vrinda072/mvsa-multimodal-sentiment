@@ -24,7 +24,8 @@ for notebook in \
   01_preprocessing/03_feature_engineering \
   02_modeling/01_training_and_model_selection \
   02_modeling/02_significance_and_robustness \
-  02_modeling/03_bias_variance_and_regularisation
+  02_modeling/03_bias_variance_and_regularisation \
+  02_modeling/04_explanation_and_error_analysis
 do
   echo "Running $notebook"
   python -m jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=-1 \
