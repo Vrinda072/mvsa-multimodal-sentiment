@@ -60,7 +60,7 @@ For example, `python scripts/predict.py --text "I love this so much, best day ev
 
 ```text
 Prediction: positive
-Score:      0.933
+Score:      0.933 (high confidence)
 Used:       text
 All classes:
   positive  0.933
@@ -68,7 +68,7 @@ All classes:
   negative  0.029
 ```
 
-The score is the model's probability for the predicted class, from 0 to 1. A high score is not a guarantee: the model is correct on about 70% of test posts, and it often misses neutral (for example, it labels the plain sentence "The meeting is at 3pm in room 204" positive, with a score of 0.63). Give both a text and an image where you can. That is the setup that was selected and evaluated, and single-modality predictions scored lower on the test set. The caption should be typed separately, because the model was trained and tested on posts whose text and image were separate. A caption inside a picture isn't read as text.
+The score is the model's probability for the predicted class, from 0 to 1. It also gets a confidence level, chosen from the validation set: high (0.70 or more), where predictions were right about 84% of the time; medium (0.45 to 0.70), right about 58% to 68% of the time; and low (below 0.45), right only about 41% of the time, close to a random guess. A high score is not a guarantee: the model is correct on about 70% of test posts, and it often misses neutral (for example, it labels the plain sentence "The meeting is at 3pm in room 204" positive, with a score of 0.63). Give both a text and an image where you can. That is the setup that was selected and evaluated, and single-modality predictions scored lower on the test set. The caption should be typed separately, because the model was trained and tested on posts whose text and image were separate. A caption inside a picture isn't read as text.
 
 The first run downloads CLIP (about 600 MB), so it needs internet access.
 
