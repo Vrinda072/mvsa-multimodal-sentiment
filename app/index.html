@@ -41,7 +41,11 @@
   #result { display: none; margin-top: 28px; padding: 24px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
   .eyebrow { margin: 0; color: var(--muted); font-size: 14px; }
   #label { margin: 0; font-size: 36px; line-height: 1.2; font-weight: 700; text-transform: capitalize; }
-  #score { margin: 2px 0 20px; color: var(--muted); }
+  #score { margin: 2px 0 12px; color: var(--muted); }
+  #confidence { margin: 0 0 20px; padding: 10px 12px; border-left: 4px solid var(--line); background: var(--surface); border-radius: 4px; font-size: 14px; }
+  #confidence strong { display: block; margin-bottom: 2px; }
+  #confidence.high { border-left-color: var(--accent); }
+  #confidence.low { border-left-color: var(--bar-other); }
   .row { display: grid; grid-template-columns: 76px 1fr 52px; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; text-transform: capitalize; }
   .row.top { font-weight: 600; }
   .track { height: 10px; background: var(--track); border-radius: 4px; overflow: hidden; }
@@ -78,6 +82,7 @@
     <p class="eyebrow">Prediction</p>
     <p id="label"></p>
     <p id="score"></p>
+    <p id="confidence"><strong></strong><span></span></p>
     <div id="bars"></div>
     <p id="note"></p>
   </section>
@@ -120,6 +125,16 @@
   function showResult(result) {
     $("label").textContent = result.label;
     $("score").textContent = `Score ${result.score.toFixed(3)}`;
+    const levels = {
+      high: ["High confidence", "Predictions this confident were right about 84% of the time on validation posts."],
+      medium: ["Medium confidence", "Treat this as a likely answer. Predictions in this range were right about 58% to 68% of the time."],
+      low: ["Low confidence", "Treat this as a guess. Predictions this unsure were right only about 41% of the time."],
+    };
+    const [title, detail] = levels[result.confidence];
+    $("confidence").className = result.confidence;
+    $("confidence").querySelector("strong").textContent = title;
+    $("confidence").querySelector("span").textContent = result.used.length === 2
+      ? detail : `${detail} Those figures are for posts with both a picture and a caption, so expect less with only one.`;
     const rows = Object.entries(result.probabilities).sort((a, b) => b[1] - a[1]);
     $("bars").replaceChildren(...rows.map(([name, value]) => {
       const row = document.createElement("div");
