@@ -46,6 +46,11 @@
   #confidence strong { display: block; margin-bottom: 2px; }
   #confidence.high { border-left-color: var(--accent); }
   #confidence.low { border-left-color: var(--bar-other); }
+  #readings { display: none; margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
+  .reading { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; font-size: 15px; }
+  .reading .what { text-transform: capitalize; font-weight: 600; }
+  .reading .muted { color: var(--muted); }
+  #conflict { display: none; margin: 12px 0 0; padding: 10px 12px; border-left: 4px solid var(--accent); background: var(--surface); border-radius: 4px; font-size: 14px; }
   .row { display: grid; grid-template-columns: 76px 1fr 52px; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; text-transform: capitalize; }
   .row.top { font-weight: 600; }
   .track { height: 10px; background: var(--track); border-radius: 4px; overflow: hidden; }
@@ -84,6 +89,11 @@
     <p id="score"></p>
     <p id="confidence"><strong></strong><span></span></p>
     <div id="bars"></div>
+    <div id="readings">
+      <p class="eyebrow">What each part says on its own</p>
+      <div id="reading-rows"></div>
+      <p id="conflict"><strong>Possible sarcasm or mixed message.</strong> The caption and the picture point in opposite directions, so the overall result is less reliable.</p>
+    </div>
     <p id="note"></p>
   </section>
 </main>
@@ -133,8 +143,27 @@
     const [title, detail] = levels[result.confidence];
     $("confidence").className = result.confidence;
     $("confidence").querySelector("strong").textContent = title;
-    $("confidence").querySelector("span").textContent = result.used.length === 2
-      ? detail : `${detail} Those figures are for posts with both a picture and a caption, so expect less with only one.`;
+    const alone = {
+      high: "Readings this confident were right about 80% (caption) to 91% (picture) of the time on validation posts.",
+      medium: "Treat this as a likely answer. Readings in this range were right about 62% of the time.",
+      low: "Treat this as a guess. Readings this unsure were right less than 40% of the time.",
+    };
+    $("confidence").querySelector("span").textContent = result.used.length === 2 ? detail : alone[result.confidence];
+    const readings = Object.entries(result.readings || {});
+    $("readings").style.display = readings.length === 2 ? "block" : "none";
+    $("reading-rows").replaceChildren(...readings.map(([part, r]) => {
+      const row = document.createElement("div");
+      row.className = "reading";
+      const what = document.createElement("span");
+      what.className = "what";
+      what.textContent = `${part === "text" ? "Caption" : "Picture"}: ${r.label}`;
+      const score = document.createElement("span");
+      score.className = "muted";
+      score.textContent = `${r.score.toFixed(3)} · ${r.confidence} confidence`;
+      row.append(what, score);
+      return row;
+    }));
+    $("conflict").style.display = result.conflict ? "block" : "none";
     const rows = Object.entries(result.probabilities).sort((a, b) => b[1] - a[1]);
     $("bars").replaceChildren(...rows.map(([name, value]) => {
       const row = document.createElement("div");
@@ -153,9 +182,9 @@
       row.append(label, track, number);
       return row;
     }));
-    const single = result.used.length === 1
-      ? ` This used only the ${result.used[0]}, which scored lower in testing than using both.` : "";
-    $("note").textContent = `The score is the model's probability for this class, not a guarantee. The model is right on about 70% of test posts, and neutral is its weakest class.${single}`;
+    $("note").textContent = result.used.length === 2
+      ? "The score is the model's probability for this class, not a guarantee. The overall model is right on about 70% of test posts, and neutral is its weakest class."
+      : `This judged the ${result.used[0] === "text" ? "caption" : "picture"} on its own, using a model trained on ${result.used[0]} labels. The score is its probability for this class, not a guarantee.`;
     $("result").style.display = "block";
     $("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
