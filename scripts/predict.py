@@ -29,7 +29,7 @@ def main():
 
     result = SentimentModel().predict(args.text, args.image)
     print(f"Prediction: {result['label']}")
-    print(f"Score:      {result['score']:.3f}")
+    print(f"Score:      {result['score']:.3f} ({result['confidence']} confidence)")
     print(f"Used:       {' and '.join(result['used'])}")
     print("All classes:")
     for label, probability in sorted(result["probabilities"].items(), key=lambda item: -item[1]):

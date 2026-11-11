@@ -57,6 +57,10 @@ class PredictTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.model.proba_from_embeddings(text=np.zeros((1, 4)))
 
+    def test_confidence_levels(self):
+        from mvsa.predict import confidence_level
+        self.assertEqual([confidence_level(s) for s in (0.9, 0.70, 0.6, 0.45, 0.44)], ["high", "high", "medium", "medium", "low"])
+
     def test_rejects_missing_input(self):
         with self.assertRaises(ValueError):
             self.model.proba_from_embeddings()
