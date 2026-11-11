@@ -41,6 +41,40 @@ No. For logistic regression, gated fusion was less accurate than early fusion on
 
 The gate relies on the two sets of class probabilities and gives the Jensen-Shannon divergence almost no weight, so it behaves much like an average of the two modalities. These inputs are correlated and the coefficients come from one seed, so this is supporting evidence rather than proof.
 
+## What the predictions rely on
+
+![Drop in macro-F1 when each input is shuffled](../results/figures/09_permutation_importance.png)
+
+Permutation importance shuffles one input across the test posts and measures how much test macro-F1 drops. A bigger drop means the model relies on that input more.
+
+- **The image matters more than the text** in every fusion setup. For the chosen late-fusion model, shuffling the image cuts macro-F1 by 0.124 and shuffling the text by 0.094.
+- **The gate barely uses its agreement signals.** Over five seeds, shuffling the cosine similarity and Jensen-Shannon divergence cuts macro-F1 by only 0.009, and shuffling the confidence values changes nothing (−0.001). The gate relies on the two models' probabilities instead (0.156 for the image and 0.085 for the text). This explains why gated fusion behaved like an average of the two modalities and didn't beat simpler fusion.
+
+## Characteristic errors
+
+The chosen model misclassified 136 of the 447 test posts (30.4%). Its confusion matrix is identical across all five seeds, because logistic regression is deterministic. Gated fusion varies slightly between seeds.
+
+| Group of test posts | Posts | Error rate |
+|---|---:|---:|
+| All | 447 | 30.4% |
+| Separate text and image models agree | 246 | 19.9% |
+| Separate text and image models disagree | 201 | 43.3% |
+| Score 0.70 or more | 166 | 12.7% |
+| Score below 0.45 | 39 | 66.7% |
+| Human labels agree | 253 | 24.1% |
+| Soft mismatch | 194 | 38.7% |
+
+The most common mistakes are positive posts predicted negative (40) or neutral (36), and negative posts predicted positive (26). Reading the most confident mistakes shows four patterns:
+
+- **Mixed or ironic posts:** for example, a complaint about bad weather paired with a photo of a sunny holiday the writer wishes they were on.
+- **Sad wording with a positive label:** quotes about grief or loss that the annotators marked positive.
+- **Product listings and adverts:** plain descriptions of items for sale, which the model reads as neutral but annotators often marked positive.
+- **Likely label noise:** some posts look neutral or ambiguous to a reader despite their label. MVSA-Single has a single annotator per modality.
+
+The score and the agreement between the two separate models are useful warnings. When the score is below 0.45, two in three predictions are wrong. When the text and image models disagree, the error rate more than doubles.
+
+On hard-mismatch posts, the chosen model's prediction matches the image label 51.0% of the time and the text label 41.1%.
+
 ## Missing modalities
 
 ![Macro-F1 with both modalities, the image masked and the text masked](../results/figures/06_missing_modality.png)
@@ -57,7 +91,7 @@ The chosen `C = 0.01` is the strongest value in the tuning grid. Late fusion rea
 
 ## Limitations
 
-The top validation scores differ by only 0.006 on 446 posts, and no confidence intervals were computed. The McNemar tests, gate coefficients, confusion matrix and robustness results each use a single seed.
+The top validation scores differ by only 0.006 on 446 posts, and no confidence intervals were computed. The McNemar tests, gate coefficients and robustness results each use a single seed.
 
 ## Reproducibility
 
@@ -80,3 +114,4 @@ The checks on new text used CLIP on a different machine, whose text embeddings m
 | Model comparison, per-class and per-group results | `01_training_and_model_selection.ipynb` |
 | McNemar tests, missing modalities, gate coefficients, confusion matrix | `02_significance_and_robustness.ipynb` |
 | Bias-variance curve and tuned hyperparameters | `03_bias_variance_and_regularisation.ipynb` |
+| Permutation importance, confusion matrices over seeds, error analysis | `04_explanation_and_error_analysis.ipynb` |

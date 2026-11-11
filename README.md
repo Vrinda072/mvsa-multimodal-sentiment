@@ -25,14 +25,15 @@ This project classifies Twitter text-image posts as negative, neutral or positiv
 │   └── 02_modeling/
 │       ├── 01_training_and_model_selection.ipynb
 │       ├── 02_significance_and_robustness.ipynb
-│       └── 03_bias_variance_and_regularisation.ipynb
+│       ├── 03_bias_variance_and_regularisation.ipynb
+│       └── 04_explanation_and_error_analysis.ipynb
 ├── results/
 │   ├── figures/                     charts of the results
 │   ├── metrics/                     saved scores and settings from the full run
 │   └── model/                       the saved final model
 ├── scripts/
 │   ├── predict.py                   predicts the sentiment of a new post
-│   ├── run_all.sh                   runs all six notebooks in order
+│   ├── run_all.sh                   runs all seven notebooks in order
 │   ├── train_final_model.py         retrains and saves the final model
 │   └── make_figures.py              redraws the figures from the saved metrics
 ├── src/mvsa/                        code shared by the notebooks
@@ -128,7 +129,7 @@ Running the pipeline creates these folders:
 
 | Folder | Contents |
 |---|---|
-| `runs/executed/` | Executed copies of all six notebooks |
+| `runs/executed/` | Executed copies of all seven notebooks |
 | `runs/preprocessed/` | Clean posts, features for each split, and the fitted TF-IDF vectoriser and scaler |
 | `runs/models/` | Scores, tuned settings, the chosen model's details and the bias-variance figure |
 | `runs/interim/` | Results passed from one notebook to the next |
@@ -160,3 +161,5 @@ The outputs in the notebooks, and everything in `results/metrics/`, come from fu
 Each cell's output is the one its code produced in those runs. The setup and save cells added by the split show no output, because they weren't part of them.
 
 The six notebooks were then run in order on the full dataset with `scripts/run_all.sh`, following the Kaggle steps above. All six finished without errors in about 28 minutes on a GPU T4 x2 machine. The results matched except for small MLP differences. See [Reproducibility](docs/results.md#reproducibility).
+
+The fourth modelling notebook, `04_explanation_and_error_analysis.ipynb`, was added after these runs. Its saved outputs come from running it on a computer, using the preprocessed features from that full-data rerun. Its confusion matrix for the chosen model matches the Kaggle run exactly.
