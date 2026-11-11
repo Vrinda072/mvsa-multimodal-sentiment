@@ -178,6 +178,33 @@ def bias_variance():
     save(fig, "08_bias_variance_curve.png")
 
 
+def permutation_importance():
+    modality = pd.read_csv(metric("permutation_importance_modality.csv"))
+    gate = pd.read_csv(metric("permutation_importance_gate.csv"), index_col=0)
+    fig, (left, right) = plt.subplots(1, 2, figsize=(12, 3.9), gridspec_kw={"width_ratios": [1, 1.25]})
+    setups = ["early", "late", "gated"]
+    series = [(f"{name.capitalize()} shuffled", modality.set_index(["setup", "shuffled"]).loc[[(s, name) for s in setups], "drop_mean"].to_numpy(), colour)
+              for name, colour in (("text", BLUE), ("image", ORANGE))]
+    bars(left, ["Early fusion", "Late fusion", "Gated fusion"], series, width=0.34, fmt="{:.3f}")
+    left.set_ylim(0, 0.2)
+    left.set_ylabel("Drop in test macro-F1")
+    left.set_title("Shuffling each modality", loc="left")
+    left.legend(loc="upper left", ncol=2)
+    names = ["Text probabilities", "Image probabilities", "Agreement signals", "Confidence"]
+    drawn = right.barh(names[::-1], gate["mean"].to_numpy()[::-1], 0.55, color=BLUE)
+    for y, v in enumerate(gate["mean"].to_numpy()[::-1]):   # values sit right of zero even when slightly negative
+        right.text(max(v, 0) + 0.003, y, f"{v:.3f}", va="center", fontsize=8, color=MUTED)
+    right.axvline(0, color=GRID, linewidth=1)
+    right.set_xlim(-0.01, 0.2)
+    right.set_xlabel("Drop in test macro-F1")
+    right.set_title("Inside the gate (5 seeds)", loc="left")
+    right.tick_params(length=0)
+    right.xaxis.grid(True, color=GRID, linewidth=0.8)
+    right.set_axisbelow(True)
+    fig.tight_layout()
+    save(fig, "09_permutation_importance.png")
+
+
 if __name__ == "__main__":
     os.makedirs(FIGURES, exist_ok=True)
     dataset_overview()
@@ -187,3 +214,4 @@ if __name__ == "__main__":
     robustness()
     gate_coefficients()
     bias_variance()
+    permutation_importance()
