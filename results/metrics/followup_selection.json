@@ -1,0 +1,113 @@
+{
+ "rule": "highest mean macro-F1 over 3 x 5-fold grouped cross-validation on train + validation",
+ "configurations_compared": 120,
+ "chosen": {
+  "setup": "late_tfidf",
+  "C": 0.001,
+  "neutral": 0.75
+ },
+ "cv_chosen": {
+  "macro_f1": 0.6403,
+  "macro_f1_std": 0.0171,
+  "accuracy": 0.7442,
+  "neutral_f1": 0.3988
+ },
+ "cv_main_model": {
+  "macro_f1": 0.6133,
+  "macro_f1_std": 0.0219,
+  "accuracy": 0.6988,
+  "neutral_f1": 0.3822
+ },
+ "top_8": [
+  {
+   "config": {
+    "setup": "late_tfidf",
+    "C": 0.001,
+    "neutral": 0.75
+   },
+   "macro_f1": 0.6403,
+   "macro_f1_std": 0.0171,
+   "accuracy": 0.7442,
+   "neutral_f1": 0.3988
+  },
+  {
+   "config": {
+    "setup": "early_meta",
+    "C": 0.001,
+    "neutral": 0.75
+   },
+   "macro_f1": 0.638,
+   "macro_f1_std": 0.0216,
+   "accuracy": 0.7283,
+   "neutral_f1": 0.412
+  },
+  {
+   "config": {
+    "setup": "late",
+    "C": 0.001,
+    "w": 0.5,
+    "neutral": 0.75
+   },
+   "macro_f1": 0.6373,
+   "macro_f1_std": 0.0204,
+   "accuracy": 0.7307,
+   "neutral_f1": 0.4102
+  },
+  {
+   "config": {
+    "setup": "late_tfidf",
+    "C": 0.001,
+    "neutral": 1.0
+   },
+   "macro_f1": 0.635,
+   "macro_f1_std": 0.0152,
+   "accuracy": 0.7242,
+   "neutral_f1": 0.4045
+  },
+  {
+   "config": {
+    "setup": "early_meta",
+    "C": 0.0001,
+    "neutral": 0.75
+   },
+   "macro_f1": 0.6347,
+   "macro_f1_std": 0.0211,
+   "accuracy": 0.7332,
+   "neutral_f1": 0.3949
+  },
+  {
+   "config": {
+    "setup": "early_meta",
+    "C": 0.001,
+    "neutral": 1.0
+   },
+   "macro_f1": 0.6335,
+   "macro_f1_std": 0.0197,
+   "accuracy": 0.7139,
+   "neutral_f1": 0.4155
+  },
+  {
+   "config": {
+    "setup": "early_meta",
+    "C": 0.0001,
+    "neutral": 1.0
+   },
+   "macro_f1": 0.632,
+   "macro_f1_std": 0.0151,
+   "accuracy": 0.7099,
+   "neutral_f1": 0.4153
+  },
+  {
+   "config": {
+    "setup": "late",
+    "C": 0.001,
+    "w": 0.3,
+    "neutral": 0.75
+   },
+   "macro_f1": 0.6304,
+   "macro_f1_std": 0.0215,
+   "accuracy": 0.7191,
+   "neutral_f1": 0.4117
+  }
+ ]
+}
