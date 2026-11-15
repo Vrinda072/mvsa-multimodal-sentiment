@@ -6,6 +6,8 @@ This project classifies Twitter text-image posts as negative, neutral or positiv
 
 **Main result:** logistic regression with late fusion was selected by validation score and reaches 0.603 macro-F1 and 0.696 accuracy on the test set, compared with 0.504 and 0.622 for the baseline. The proposed gated fusion did not beat early fusion. See [docs/results.md](docs/results.md).
 
+**Follow-up:** after the main results were fixed, a configuration chosen by cross-validation on the training and validation splits only (a smaller C, a TF-IDF word model as a third voter and a lower weight on neutral) reaches 0.643 macro-F1 and 0.761 accuracy on the test set. The demo uses this model. See [Follow-up model](docs/results.md#follow-up-model).
+
 ![Test macro-F1 for every classifier and fusion setup](results/figures/03_model_comparison.png)
 
 ## Project structure
@@ -30,11 +32,12 @@ This project classifies Twitter text-image posts as negative, neutral or positiv
 ├── results/
 │   ├── figures/                     charts of the results
 │   ├── metrics/                     saved scores and settings from the full run
-│   └── model/                       the saved final model
+│   └── model/                       the saved model used for new predictions
 ├── scripts/
 │   ├── predict.py                   predicts the sentiment of a new post
 │   ├── run_all.sh                   runs all seven notebooks in order
-│   ├── train_final_model.py         retrains and saves the final model
+│   ├── select_followup_model.py     chooses the follow-up model by cross-validation
+│   ├── train_final_model.py         retrains and saves the model used for predictions
 │   └── make_figures.py              redraws the figures from the saved metrics
 ├── src/mvsa/                        code shared by the notebooks
 ├── tests/                           unit tests, smoke test and synthetic data
@@ -43,7 +46,7 @@ This project classifies Twitter text-image posts as negative, neutral or positiv
 
 ## Try it on a new post
 
-The final model is saved in `results/model/`, so you can classify a post that isn't in the dataset without downloading the dataset or retraining. Install the dependencies below, then start the demo page:
+The follow-up model is saved in `results/model/`, so you can classify a post that isn't in the dataset without downloading the dataset or retraining. Install the dependencies below, then start the demo page:
 
 ```bash
 python app/server.py
@@ -69,7 +72,7 @@ All classes:
   negative  0.083
 ```
 
-The score is the model's probability for the predicted class, from 0 to 1. It also gets a confidence level, chosen from the validation set: high (0.70 or more), where predictions were right about 84% of the time; medium (0.45 to 0.70), right about 58% to 68% of the time; and low (below 0.45), right only about 41% of the time, close to a random guess. A high score is not a guarantee: the overall model is correct on about 70% of test posts, and neutral is its weakest class. With only a caption or only a picture, the result is that part's own reading, which judges it by itself. For example, the plain sentence "The meeting is at 3pm in room 204" comes out neutral (0.592). With both, the overall result follows the dataset's rule, so a neutral caption with a happy picture counts as positive, and the page shows each part's reading alongside. The caption should be typed separately, because the model was trained and tested on posts whose text and image were separate. A caption inside a picture isn't read as text.
+The score is the model's probability for the predicted class, from 0 to 1. It also gets a confidence level. On validation posts with both a caption and a picture, predictions were right about 95% of the time at high confidence (0.70 or more), 72% at medium (0.45 to 0.70) and about half the time at low (below 0.45). A high score is not a guarantee: the model is correct on about 76% of test posts, and neutral is its weakest class. With only a caption or only a picture, the result is that part's own reading, which judges it by itself. For example, the plain sentence "The meeting is at 3pm in room 204" comes out neutral (0.592). With both, the overall result follows the dataset's rule, so a neutral caption with a happy picture counts as positive, and the page shows each part's reading alongside. The caption should be typed separately, because the model was trained and tested on posts whose text and image were separate. Words inside a picture are seen only by the picture model: CLIP picks up large, clear words, but not small text on a busy background.
 
 The first run downloads CLIP (about 600 MB), so it needs internet access.
 
@@ -123,6 +126,7 @@ bash tests/smoke_test.sh
 ## Dependencies
 
 Python packages are listed in `requirements.txt`. Versions aren't pinned, because the results came from Kaggle's "Latest Container Image" environment. `emoji`, `wordsegment`, `ftfy` and `nltk` are optional: without them the code uses simpler fallbacks or skips VADER scores, which can change results slightly.
+
 ## Expected outputs
 
 Running the pipeline creates these folders:
@@ -134,7 +138,7 @@ Running the pipeline creates these folders:
 | `runs/models/` | Scores, tuned settings, the chosen model's details and the bias-variance figure |
 | `runs/interim/` | Results passed from one notebook to the next |
 
-To rebuild the saved model from your run, use `python scripts/train_final_model.py runs/preprocessed`. It also trains the separate caption and picture readings used by the demo, on each modality's own labels.
+To redo the follow-up from your run, use `python scripts/select_followup_model.py runs/preprocessed` (about 10 minutes on a CPU), then `python scripts/train_final_model.py runs/preprocessed` to rebuild the saved model. The second script also trains the separate caption and picture readings used by the demo, on each modality's own labels, and prints the test scores of both the main model and the follow-up.
 
 Compare your run with these values. MLP scores can vary between environments.
 
@@ -153,6 +157,15 @@ Compare your run with these values. MLP scores can vary between environments.
 | Negative | 0.653 | 0.701 | 0.676 | 134 |
 | Neutral | 0.275 | 0.487 | 0.352 | 39 |
 | Positive | 0.846 | 0.723 | 0.780 | 274 |
+
+Follow-up model (`results/metrics/followup_results.json`):
+
+| Check | Expected value |
+|---|---|
+| Chosen by cross-validation | CLIP text + CLIP image + TF-IDF, C = 0.001, neutral x 0.75 |
+| Cross-validation macro-F1 | 0.640 |
+| Test macro-F1 / accuracy | 0.643 / 0.761 |
+| Test F1: negative / neutral / positive | 0.695 / 0.394 / 0.840 |
 
 ## How the saved outputs were produced
 

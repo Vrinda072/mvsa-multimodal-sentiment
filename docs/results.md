@@ -102,11 +102,32 @@ Masking the image hurt macro-F1 in all three fusion setups, while masking the te
 
 Stronger L2 regularisation narrowed early fusion's train-validation gap from 0.46 to 0.10, showing that its main risk is high variance. At large `C`, it almost memorises the training set (0.991) while validation stays near 0.53.
 
-The chosen `C = 0.01` is the strongest value in the tuning grid. Late fusion reaches 0.627 at `C = 0.001`, compared with 0.619 at the selected value. The reported model keeps the pre-specified grid.
+The chosen `C = 0.01` is the strongest value in the tuning grid. Late fusion reaches 0.627 at `C = 0.001`, compared with 0.619 at the selected value. The reported model keeps the pre-specified grid. The [follow-up model](#follow-up-model) tests smaller values properly, by cross-validation.
+
+## Follow-up model
+
+After the main results above were fixed, a follow-up checked whether a few cheap changes would help. It kept the same frozen CLIP features and logistic regression, and nothing above was changed.
+
+- **Search:** 120 configurations, made from early, early + meta, late fusion (text weight 0.3, 0.5 or 0.7) and late fusion with a TF-IDF word model as a third voter; `C` from 0.00001 to 0.1; and a multiplier of 0.75 to 1.5 on the neutral probability.
+- **Choice:** the rule, fixed beforehand, was the highest mean macro-F1 over 3 x 5-fold cross-validation on the training and validation splits combined, with posts that share a caption kept in one fold. The test and hard-mismatch splits weren't used.
+- **Chosen:** the CLIP text, CLIP image and TF-IDF models with their probabilities averaged, `C = 0.001` and neutral x 0.75. Cross-validation macro-F1 was 0.640 (standard deviation 0.017), against 0.613 for the main model's configuration. The next two configurations scored 0.638 and 0.637, so the choice among them is close.
+- **Test:** the chosen model was trained on the training split, like the main model, and scored on the test split once.
+
+| Test set (447 posts) | Macro-F1 | Accuracy | Negative F1 | Neutral F1 | Positive F1 |
+|---|---:|---:|---:|---:|---:|
+| Main model (late fusion, `C = 0.01`) | 0.603 | 0.696 | 0.676 | 0.352 | 0.780 |
+| **Follow-up model** | **0.643** | **0.761** | **0.695** | **0.394** | **0.840** |
+
+- **How sure the gain is:** the follow-up was right on 43 posts where the main model was wrong, and wrong on 14 where it was right (McNemar p = 0.0002). Over 5,000 bootstrap resamples of the test posts, the accuracy gain lies between +0.031 and +0.096, and the macro-F1 gain between -0.012 and +0.087, so the macro-F1 gain is less certain. The follow-up's own 95% intervals are 0.580 to 0.700 for macro-F1 and 0.720 to 0.799 for accuracy.
+- **Trade-off on neutral:** neutral F1 rose, but the follow-up predicts neutral far less often: 27 test posts instead of 69. Neutral precision rose from 0.275 to 0.481, and recall fell from 0.487 to 0.333.
+- **Hard-mismatch posts:** the follow-up matches the text label on 52.1% and the image label on 46.5%, so it leans more on the text than the main model does (41.1% and 51.0%).
+- **Comparison:** about 0.76 accuracy is in line with the 73% to 77% usually reported on MVSA-Single, although those papers use other labelling rules and splits, so the numbers aren't directly comparable.
+
+The demo and `scripts/predict.py` use the follow-up model. Its selection is saved in `results/metrics/followup_selection.json` and its test scores in `results/metrics/followup_results.json`. Both can be recomputed with `scripts/select_followup_model.py` and `scripts/train_final_model.py`.
 
 ## Limitations
 
-The top validation scores differ by only 0.006 on 446 posts, and no confidence intervals were computed. The McNemar tests, gate coefficients and robustness results each use a single seed.
+The top validation scores differ by only 0.006 on 446 posts, and the main comparison has no confidence intervals. The McNemar tests, gate coefficients and robustness results each use a single seed. The follow-up was chosen after the main results were known, so although its choice used only training and validation data, it is reported separately from them.
 
 ## Reproducibility
 
@@ -118,7 +139,7 @@ The code was the same in both runs, but the model training ran on a CPU machine 
 
 ## Predicting new posts
 
-`scripts/predict.py` uses the saved final model in `results/model/`. On the test set, that saved model gives the same prediction as the full Kaggle run for all 447 posts, with 0.603 macro-F1 and 0.696 accuracy. Its text-cleaning code also reproduces the cleaned text of all 4,839 posts.
+`scripts/predict.py` and the demo use the saved follow-up model in `results/model/`. Built from the preprocessed features of the full-data rerun, it gives 0.643 macro-F1 and 0.761 accuracy on the test set, as above. Its own TF-IDF code gives the same vectors as the saved scikit-learn vectoriser on every validation post, and its text-cleaning code reproduces the cleaned text of all 4,839 posts. When a caption or picture is given alone, the result is that part's own reading.
 
 The checks on new text used CLIP on a different machine, whose text embeddings matched the Kaggle ones on the 40 test posts compared. The same comparison wasn't run for images, because the dataset's images weren't available on that machine, so image predictions were only tested for running correctly.
 

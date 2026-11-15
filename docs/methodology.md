@@ -40,6 +40,8 @@ The gate trains on 5-fold out-of-fold predictions, which stops it learning from 
 3. Retrain each tuned setup over five seeds and report the mean and standard deviation.
 4. Choose the final model by validation macro-F1. Test scores are reported but never used to choose.
 
+A follow-up, run after the main results were fixed, compared 120 configurations by 3 x 5-fold grouped cross-validation on the training and validation splits combined, and scored only the winner on the test split. It is reported separately, in [results.md](results.md#follow-up-model).
+
 ## Evaluation
 
 - **Accuracy:** the share of all posts predicted correctly.
