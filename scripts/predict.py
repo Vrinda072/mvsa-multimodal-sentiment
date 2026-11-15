@@ -1,11 +1,11 @@
-"""Predict the sentiment of a new post with the final model.
+"""Predict the sentiment of a new post with the saved model.
 
 Usage:
   python scripts/predict.py --text "What a great day" --image photo.jpg
   python scripts/predict.py --text "What a great day"
   python scripts/predict.py --image photo.jpg
 
-Giving both a text and an image uses the selected late-fusion model and also shows what each part says on its own.
+Giving both a text and an image uses the saved follow-up model (CLIP text, CLIP image and TF-IDF, averaged) and also shows what each part says on its own.
 Giving only one uses a model trained on that modality's own labels, which judges a caption or a picture by itself.
 """
 import argparse

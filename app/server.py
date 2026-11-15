@@ -1,4 +1,4 @@
-"""A small local web page for trying the final model on your own posts.
+"""A small local web page for trying the saved model on your own posts.
 
 It uses only Python's standard library plus the project's dependencies. It listens on this computer only, and
 uploaded images are kept in memory for the prediction and never saved.

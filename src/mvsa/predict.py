@@ -1,10 +1,14 @@
-"""Predict the sentiment of a new post with the final model.
+"""Predict the sentiment of a new post.
 
-The final model is two logistic regressions, one on CLIP text embeddings and one on CLIP image embeddings,
-whose class probabilities are averaged (late fusion). It is stored as plain arrays, so it loads with any
-scikit-learn version.
+The saved model (scripts/train_final_model.py) is the follow-up model: three logistic regressions, on CLIP text
+embeddings, CLIP image embeddings and TF-IDF word counts of the caption, whose class probabilities are averaged,
+with the neutral probability multiplied by a fixed factor. It is stored as plain arrays, so it loads without
+scikit-learn.
 """
+import math
 import os
+import re
+from collections import Counter
 
 import numpy as np
 
@@ -13,8 +17,8 @@ from mvsa.text import ftfy, clean_text
 DEFAULT_MODEL = os.path.join(os.path.dirname(__file__), "..", "..", "results", "model", "final_model.npz")
 EMPTY_PLACEHOLDER = "no text"   # the same placeholder that training used for empty captions
 
-# Confidence cut-offs, chosen from the validation set with both text and image given. There, predictions scoring
-# 0.70 or more were right 84% of the time, and those below 0.45 only 41%, close to the 33% of a random guess.
+# Confidence cut-offs. On the validation split, with both caption and picture given, how often predictions at
+# each level were right is saved in results/metrics/followup_results.json.
 HIGH_CONFIDENCE = 0.70
 LOW_CONFIDENCE = 0.45
 
@@ -24,6 +28,27 @@ def confidence_level(score):
     if score >= HIGH_CONFIDENCE:
         return "high"
     return "medium" if score >= LOW_CONFIDENCE else "low"
+
+
+TOKEN_RE = re.compile(r"(?u)\b\w\w+\b")   # scikit-learn's default token pattern
+
+
+def tfidf_vector(text, vocabulary, idf):
+    """TF-IDF features as in training: lowercase, words and word pairs, 1 + log(count), times idf, unit length."""
+    words = TOKEN_RE.findall(text.lower())
+    terms = words + [" ".join(pair) for pair in zip(words, words[1:])]
+    vector = np.zeros(len(idf))
+    for term, count in Counter(terms).items():
+        if term in vocabulary:
+            vector[vocabulary[term]] = (1 + math.log(count)) * idf[vocabulary[term]]
+    norm = np.linalg.norm(vector)
+    return vector / norm if norm > 0 else vector
+
+
+def clean_caption(text):
+    """Fix broken characters and clean a caption, the same way the training captions were cleaned."""
+    text = (ftfy.fix_text(text) if ftfy is not None else text).strip()
+    return clean_text(text)
 
 
 def softmax(logits):
@@ -37,8 +62,9 @@ class SentimentModel:
         with np.load(path, allow_pickle=False) as f:
             self.parts = {k: f[k] for k in f.files}
         self.labels = [str(l) for l in self.parts["labels"]]
-        self.text_weight = float(self.parts["text_weight"])
         self.clip_model = str(self.parts["clip_model"])
+        self.neutral_multiplier = float(self.parts["neutral_multiplier"])
+        self.vocabulary = {str(t): i for i, t in enumerate(self.parts["words_terms"])}
         self._clip = None
 
     def _proba(self, modality, embeddings, prefix=""):
@@ -60,16 +86,32 @@ class SentimentModel:
         """What one modality says on its own: its model was trained on that modality's own labels."""
         return self._proba(modality, embeddings, prefix="own_")
 
-    def proba_from_embeddings(self, text=None, image=None):
-        """Late fusion of both modalities. If only one is given, that modality's model is used alone."""
+    def words_vector(self, text):
+        """TF-IDF features of a caption."""
+        return tfidf_vector(clean_caption(text), self.vocabulary, self.parts["words_idf"])[None, :]
+
+    def _words_proba(self, words):
+        p = self.parts
+        return softmax(np.atleast_2d(words) @ p["words_coef"].T + p["words_intercept"])
+
+    def proba_from_embeddings(self, text=None, image=None, words=None):
+        """The fused probabilities for a caption and a picture.
+
+        text and image are CLIP embeddings and words the caption's TF-IDF vector. The three models' probabilities
+        are averaged, the neutral one is multiplied by the saved factor, and the result is scaled to sum to 1.
+        If only one CLIP embedding is given, that modality's model is used alone.
+        """
         if text is None and image is None:
             raise ValueError("Give a text, an image, or both.")
         if image is None:
             return self._proba("text", text)
         if text is None:
             return self._proba("image", image)
-        w = self.text_weight
-        return w * self._proba("text", text) + (1 - w) * self._proba("image", image)
+        if words is None:
+            raise ValueError("Give the caption's TF-IDF vector (words_vector) along with the text embedding.")
+        proba = (self._proba("text", text) + self._proba("image", image) + self._words_proba(words)) / 3
+        proba[:, self.labels.index("neutral")] *= self.neutral_multiplier
+        return proba / proba.sum(axis=1, keepdims=True)
 
     def _load_clip(self):
         """Load CLIP once, on first use, because it is slow to start."""
@@ -84,8 +126,7 @@ class SentimentModel:
     def embed_text(self, text):
         """Clean a caption and embed it, the same way the training data was processed."""
         torch, model, processor, device = self._load_clip()
-        text = (ftfy.fix_text(text) if ftfy is not None else text).strip()
-        cleaned = clean_text(text) or EMPTY_PLACEHOLDER
+        cleaned = clean_caption(text) or EMPTY_PLACEHOLDER
         tokens = processor.tokenizer([cleaned], padding=True, truncation=True, return_tensors="pt",
                                      max_length=model.config.text_config.max_position_embeddings).to(device)
         with torch.no_grad():
@@ -111,11 +152,11 @@ class SentimentModel:
         return {"label": self.labels[best], "score": float(proba[best]), "confidence": confidence_level(float(proba[best])),
                 "probabilities": {l: float(v) for l, v in zip(self.labels, proba)}}
 
-    def predict_embeddings(self, text=None, image=None):
+    def predict_embeddings(self, text=None, image=None, words=None):
         """Overall sentiment plus, when the model has them, what the text and the image each say.
 
-        With both inputs, the overall result comes from the evaluated late-fusion model. With one input, it is that
-        modality's own reading, because a caption or picture alone should be judged on what it says itself.
+        With both inputs, the overall result comes from the fused model. With one input, it is that modality's
+        own reading, because a caption or picture alone should be judged on what it says itself.
         A conflict means one reading is positive and the other negative, as in sarcasm or mixed messages.
         """
         readings = {}
@@ -124,7 +165,7 @@ class SentimentModel:
                 if emb is not None:
                     readings[name] = self._summary(self.reading(name, emb)[0])
         if text is not None and image is not None or not readings:
-            overall = self._summary(self.proba_from_embeddings(text, image)[0])
+            overall = self._summary(self.proba_from_embeddings(text, image, words)[0])
         else:
             overall = next(iter(readings.values()))
         labels = {r["label"] for r in readings.values()}
@@ -136,8 +177,9 @@ class SentimentModel:
 
         image_path can be a path or a file-like object.
         """
-        text_embedding = self.embed_text(text) if text is not None else None
-        image_embedding = self.embed_image(image_path) if image_path is not None else None
-        if text_embedding is None and image_embedding is None:
+        if text is None and image_path is None:
             raise ValueError("Give a text, an image, or both.")
-        return self.predict_embeddings(text_embedding, image_embedding)
+        text_embedding = self.embed_text(text) if text is not None else None
+        words = self.words_vector(text) if text is not None else None
+        image_embedding = self.embed_image(image_path) if image_path is not None else None
+        return self.predict_embeddings(text_embedding, image_embedding, words)

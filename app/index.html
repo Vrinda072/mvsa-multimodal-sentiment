@@ -136,9 +136,9 @@
     $("label").textContent = result.label;
     $("score").textContent = `Score ${result.score.toFixed(3)}`;
     const levels = {
-      high: ["High confidence", "Predictions this confident were right about 84% of the time on validation posts."],
-      medium: ["Medium confidence", "Treat this as a likely answer. Predictions in this range were right about 58% to 68% of the time."],
-      low: ["Low confidence", "Treat this as a guess. Predictions this unsure were right only about 41% of the time."],
+      high: ["High confidence", "Predictions this confident were right about 95% of the time on validation posts."],
+      medium: ["Medium confidence", "Treat this as a likely answer. Predictions in this range were right about 72% of the time."],
+      low: ["Low confidence", "Treat this as a guess. Predictions this unsure were right only about half the time."],
     };
     const [title, detail] = levels[result.confidence];
     $("confidence").className = result.confidence;
@@ -183,7 +183,7 @@
       return row;
     }));
     $("note").textContent = result.used.length === 2
-      ? "The score is the model's probability for this class, not a guarantee. The overall model is right on about 70% of test posts, and neutral is its weakest class."
+      ? "The score is the model's probability for this class, not a guarantee. The overall model is right on about 76% of test posts, and neutral is its weakest class."
       : `This judged the ${result.used[0] === "text" ? "caption" : "picture"} on its own, using a model trained on ${result.used[0]} labels. The score is its probability for this class, not a guarantee.`;
     $("result").style.display = "block";
     $("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
