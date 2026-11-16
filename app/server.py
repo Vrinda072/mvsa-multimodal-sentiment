@@ -1,7 +1,8 @@
 """A small local web page for trying the saved model on your own posts.
 
 It uses only Python's standard library plus the project's dependencies. It listens on this computer only, and
-uploaded images are kept in memory for the prediction and never saved.
+uploaded images are kept in memory for the prediction and never saved. Every answer carries the numbers behind
+the prediction (src/mvsa/explain.py), which the page draws.
 
 Usage: python app/server.py
 """
@@ -23,8 +24,8 @@ MAX_BODY_BYTES = 30 * 1024 * 1024   # a 20 MB image grows by about a third when 
 UNREADABLE_IMAGE = "That file couldn't be read as an image. Please use a JPG or PNG."
 
 
-def run_prediction(model, payload):
-    """Validate one request from the page and return the model's prediction. Raises ValueError for bad input."""
+def read_request(payload, need_input=True):
+    """Validate one request from the page and return its caption and picture. Raises ValueError for bad input."""
     from PIL import Image, UnidentifiedImageError
 
     text = (payload.get("text") or "").strip() or None
@@ -37,15 +38,37 @@ def run_prediction(model, payload):
         except (binascii.Error, UnidentifiedImageError, OSError, SyntaxError, ValueError):
             raise ValueError(UNREADABLE_IMAGE)
         image = BytesIO(data)
-    if text is None and image is None:
+    if need_input and text is None and image is None:
         raise ValueError("Add a picture, a caption, or both.")
+    return text, image
+
+
+def run_prediction(model, payload):
+    """Return the model's prediction for one request from the page. Raises ValueError for bad input."""
+    text, image = read_request(payload)
     try:
         return model.predict(text, image)
     except OSError:
         raise ValueError(UNREADABLE_IMAGE)
 
 
-def make_handler(model):
+def run_explanation(model, stats, payload):
+    """Return the prediction with the numbers behind it. Raises ValueError for bad input.
+
+    A request can ask for the example post's picture ("example_image") instead of sending one, so the example's
+    caption can be edited without the picture being on this computer.
+    """
+    from mvsa.explain import explain_post
+
+    use_example = bool(payload.get("example_image")) and not payload.get("image")
+    text, image = read_request(payload, need_input=not use_example)
+    try:
+        return explain_post(model, stats, text, image, example_image=use_example)
+    except OSError:
+        raise ValueError(UNREADABLE_IMAGE)
+
+
+def make_handler(model, stats):
     class Handler(BaseHTTPRequestHandler):
         def send_body(self, status, content_type, body):
             self.send_response(status)
@@ -58,6 +81,9 @@ def make_handler(model):
             self.send_body(status, "application/json", json.dumps(content).encode())
 
         def do_GET(self):
+            if self.path == "/example":
+                from mvsa.explain import explain_example
+                return self.send_json(200, explain_example(model, stats))
             if self.path not in ("/", "/index.html"):
                 return self.send_json(404, {"error": "Not found."})
             with open(os.path.join(APP_DIR, "index.html"), "rb") as f:
@@ -71,7 +97,7 @@ def make_handler(model):
                 self.close_connection = True
                 return self.send_json(413, {"error": "That image is too large. Please use one under 20 MB."})
             try:
-                self.send_json(200, run_prediction(model, json.loads(self.rfile.read(length))))
+                self.send_json(200, run_explanation(model, stats, json.loads(self.rfile.read(length))))
             except ValueError as e:
                 self.send_json(400, {"error": str(e)})
 
@@ -87,13 +113,14 @@ def main():
     parser.add_argument("--no-browser", action="store_true", help="don't open the page automatically")
     args = parser.parse_args()
 
+    from mvsa.explain import load_stats
     from mvsa.predict import SentimentModel
 
     print("Loading the model. The first run downloads CLIP (about 600 MB), which can take a while...")
     model = SentimentModel()
     model._load_clip()
     try:
-        server = HTTPServer(("127.0.0.1", args.port), make_handler(model))
+        server = HTTPServer(("127.0.0.1", args.port), make_handler(model, load_stats()))
     except OSError:
         raise SystemExit(f"Port {args.port} is in use. Try another one: python app/server.py --port {args.port + 1}")
     url = f"http://127.0.0.1:{args.port}"

@@ -9,7 +9,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
-from server import run_prediction  # noqa: E402
+from server import read_request, run_prediction  # noqa: E402
 
 
 class FakeModel:
@@ -45,6 +45,9 @@ class RunPredictionTests(unittest.TestCase):
     def test_rejects_invalid_base64(self):
         with self.assertRaises(ValueError):
             run_prediction(FakeModel(), {"image": "data:image/png;base64,???"})
+
+    def test_blank_input_is_allowed_when_the_example_picture_is_used(self):
+        self.assertEqual(read_request({"text": ""}, need_input=False), (None, None))
 
 
 if __name__ == "__main__":

@@ -38,6 +38,7 @@ This project classifies Twitter text-image posts as negative, neutral or positiv
 │   ├── run_all.sh                   runs all seven notebooks in order
 │   ├── select_followup_model.py     chooses the follow-up model by cross-validation
 │   ├── train_final_model.py         retrains and saves the model used for predictions
+│   ├── build_explainer_stats.py     saves the training-set statistics the demo page draws
 │   └── make_figures.py              redraws the figures from the saved metrics
 ├── src/mvsa/                        code shared by the notebooks
 ├── tests/                           unit tests, smoke test and synthetic data
@@ -52,7 +53,9 @@ The follow-up model is saved in `results/model/`, so you can classify a post tha
 python app/server.py
 ```
 
-It opens in your browser. Add a picture, type its caption and click **Predict sentiment**. The page shows the overall sentiment, what the caption and the picture each say on their own, and a warning when they point in opposite directions, which can mean sarcasm or a mixed message. With only a caption or only a picture, it judges that part by itself. Everything runs on your computer, and pictures aren't saved. Press Ctrl+C in the terminal to stop it.
+It opens in your browser on an example post from the test split. Choose a picture, type its caption and click **Predict sentiment**. The page draws the model from left to right with this post's own numbers: the CLIP embeddings, the three classifiers' probabilities, their mean, the neutral rescale and the result. Click any step to see its calculation, and hover a class to trace it through the model. Below the diagram it shows how well the caption and the picture agree, where the post sits among the training posts, which words moved the word model, and the saved test results. A warning appears when the caption and the picture point in opposite directions, which can mean sarcasm or a mixed message. With only a caption or only a picture, it judges that part by itself.
+
+Everything runs on your computer, and pictures aren't saved. The dataset's pictures are not included in this repository, so the example post's picture is loaded from a public copy of the dataset and needs an internet connection; its numbers do not. Press Ctrl+C in the terminal to stop the page.
 
 You can also use the command line:
 
@@ -138,7 +141,7 @@ Running the pipeline creates these folders:
 | `runs/models/` | Scores, tuned settings, the chosen model's details and the bias-variance figure |
 | `runs/interim/` | Results passed from one notebook to the next |
 
-To redo the follow-up from your run, use `python scripts/select_followup_model.py runs/preprocessed` (about 10 minutes on a CPU), then `python scripts/train_final_model.py runs/preprocessed` to rebuild the saved model. The second script also trains the separate caption and picture readings used by the demo, on each modality's own labels, and prints the test scores of both the main model and the follow-up.
+To redo the follow-up from your run, use `python scripts/select_followup_model.py runs/preprocessed` (about 10 minutes on a CPU), then `python scripts/train_final_model.py runs/preprocessed` to rebuild the saved model. The second script also trains the separate caption and picture readings used by the demo, on each modality's own labels, and prints the test scores of both the main model and the follow-up. `python scripts/build_explainer_stats.py runs/preprocessed` rebuilds the training-set statistics the demo page draws (caption-picture similarities and the two embedding maps).
 
 Compare your run with these values. MLP scores can vary between environments.
 

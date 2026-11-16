@@ -1,228 +1,737 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Multimodal Sentiment Demo</title>
+<title>Sentiment Explainer</title>
 <style>
-  :root {
-    color-scheme: light dark;
-    --surface: #fcfcfb; --card: #ffffff; --ink: #0b0b0b; --muted: #52514e; --line: #d9d8d3;
-    --track: #e9e8e4; --accent: #2a78d6; --accent-ink: #ffffff; --bar-other: #8f8e88; --error: #b3261e;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --surface: #1a1a19; --card: #242423; --ink: #f0efec; --muted: #c3c2b7; --line: #45443f;
-      --track: #383733; --accent: #3987e5; --accent-ink: #ffffff; --bar-other: #8f8e88; --error: #ff8a80;
-    }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--surface); color: var(--ink);
-         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-  main { max-width: 640px; margin: 0 auto; padding: 40px 20px 56px; }
-  h1 { font-size: 28px; line-height: 1.2; margin: 0 0 8px; }
-  .intro { color: var(--muted); margin: 0 0 28px; }
-  label, .field-label { display: block; font-weight: 600; margin-bottom: 8px; }
-  .field { margin-bottom: 24px; }
-  .optional { color: var(--muted); font-weight: 400; }
-  #drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 180px;
-          padding: 20px; text-align: center; background: var(--card); border: 2px dashed var(--line); border-radius: 12px; cursor: pointer; }
-  #drop:hover, #drop.over, #drop:focus-visible { border-color: var(--accent); }
-  #drop:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  #drop .hint { color: var(--muted); font-size: 14px; }
-  #preview { display: none; max-width: 100%; max-height: 300px; border-radius: 8px; }
-  #remove { display: none; margin-top: 8px; padding: 0; background: none; border: 0; color: var(--accent); font: inherit; font-size: 14px; cursor: pointer; text-decoration: underline; }
-  textarea { width: 100%; min-height: 84px; padding: 12px; resize: vertical; color: var(--ink); background: var(--card);
-             border: 1px solid var(--line); border-radius: 8px; font: inherit; }
-  #predict { width: 100%; min-height: 48px; color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 8px;
-             font: inherit; font-weight: 600; cursor: pointer; }
-  #predict:disabled { opacity: .6; cursor: progress; }
-  #error { display: none; margin: 16px 0 0; color: var(--error); }
-  #result { display: none; margin-top: 28px; padding: 24px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
-  .eyebrow { margin: 0; color: var(--muted); font-size: 14px; }
-  #label { margin: 0; font-size: 36px; line-height: 1.2; font-weight: 700; text-transform: capitalize; }
-  #score { margin: 2px 0 12px; color: var(--muted); }
-  #confidence { margin: 0 0 20px; padding: 10px 12px; border-left: 4px solid var(--line); background: var(--surface); border-radius: 4px; font-size: 14px; }
-  #confidence strong { display: block; margin-bottom: 2px; }
-  #confidence.high { border-left-color: var(--accent); }
-  #confidence.low { border-left-color: var(--bar-other); }
-  #readings { display: none; margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
-  .reading { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; font-size: 15px; }
-  .reading .what { text-transform: capitalize; font-weight: 600; }
-  .reading .muted { color: var(--muted); }
-  #conflict { display: none; margin: 12px 0 0; padding: 10px 12px; border-left: 4px solid var(--accent); background: var(--surface); border-radius: 4px; font-size: 14px; }
-  .row { display: grid; grid-template-columns: 76px 1fr 52px; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; text-transform: capitalize; }
-  .row.top { font-weight: 600; }
-  .track { height: 10px; background: var(--track); border-radius: 4px; overflow: hidden; }
-  .fill { height: 100%; background: var(--bar-other); border-radius: 4px; }
-  .row.top .fill { background: var(--accent); }
-  .value { text-align: right; font-variant-numeric: tabular-nums; }
-  #note { margin: 20px 0 0; color: var(--muted); font-size: 14px; }
+:root {
+  color-scheme: light;
+  --text: #4a4a4a; --head: #444444; --para: #555555; --mute: #808080; --line: #dbdbdb; --edge: #d4d4d4; --band: #fafafa; --dark: #1e1e1e; --btn: #363636;
+  --neg: #b2182b; --pos: #2166ac; --neu: #999999;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: #fff; color: var(--text); font: 400 16px/1.5 var(--font); font-variant-numeric: tabular-nums; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--head); outline-offset: 2px; }
+
+/* Header and control row */
+#header { height: 52px; background: var(--dark); display: flex; align-items: baseline; gap: 16px; padding: 0 20px; line-height: 52px; white-space: nowrap; overflow: hidden; }
+#header b { color: #fafafa; font-size: 22px; font-weight: 500; }
+#header span { color: #d0d0d0; font-size: 16px; overflow: hidden; text-overflow: ellipsis; }
+.control { display: flex; align-items: center; gap: 12px; padding: 8px 20px; min-height: 56px; flex-wrap: wrap; }
+.thumb { width: 40px; height: 40px; border: 2px solid var(--line); border-radius: 4px; object-fit: cover; display: block; background: var(--band); }
+.btn { height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: #363636; font-size: 14px; cursor: pointer; white-space: nowrap; transition: border-color .15s, background-color .15s; }
+.btn:hover { border-color: #b5b5b5; }
+.btn.go { background: var(--btn); border-color: var(--btn); color: #fff; font-weight: 500; }
+.btn.go:hover { background: #1e1e1e; }
+#caption { flex: 1 1 320px; max-width: 640px; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 4px; font-size: 14px; color: #363636; background: #fff; }
+#caption:hover { border-color: #b5b5b5; }
+.control .sp { flex: 1 1 0; }
+.btn:disabled { opacity: .6; cursor: default; }
+.status { font-size: 14px; color: var(--para); }
+.status.err { color: #222; font-weight: 600; }
+.control label { font-size: 14px; color: var(--mute); }
+
+/* Overview */
+.cnn { background: var(--band); padding: 20px 20px 28px; }
+.net { position: relative; display: grid; max-width: 1360px; margin: 0 auto; grid-template-columns: 200px 200px 188px 76px 76px minmax(260px, 1fr); column-gap: 60px; row-gap: 16px;
+  grid-template-rows: auto repeat(3, auto) auto; align-items: center; }
+.colhead { grid-row: 1; text-align: center; line-height: 1.3; align-self: end; white-space: nowrap; display: grid; justify-items: center; }
+.colhead b { display: block; font-size: 14px; font-weight: 400; color: #000; }
+.colhead span { font-size: 12px; color: var(--mute); }
+.c1 { grid-column: 1; } .c2 { grid-column: 2; } .c3 { grid-column: 3; } .c4 { grid-column: 4; } .c5 { grid-column: 5; } .c6 { grid-column: 6; }
+.r1 { grid-row: 2; } .r2 { grid-row: 3; } .r3 { grid-row: 4; } .r23 { grid-row: 3 / span 2; } .r13 { grid-row: 2 / span 3; }
+.node { position: relative; z-index: 1; display: grid; gap: 4px; width: 100%; padding: 0; border: 0; background: none; text-align: center; cursor: pointer; border-radius: 4px; outline: 1.5px solid transparent; outline-offset: 5px; transition: outline-color .15s; }
+.node:hover { outline-color: #c4c4c4; }
+.node.sel { outline-color: var(--head); }
+.nl { font-size: 12px; color: var(--mute); line-height: 1.3; }
+.node img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 2px; }
+.empty { display: grid; place-items: center; aspect-ratio: 3 / 2; border: 1px dashed #b5b5b5; border-radius: 2px; font-size: 13px; color: var(--mute); background: #fff; }
+.capbox { display: block; background: #fff; border: 1px solid var(--line); border-radius: 2px; padding: 12px; font-size: 14px; color: #363636; text-align: left; line-height: 1.4; overflow-wrap: anywhere; }
+canvas.heat { display: block; width: 100%; height: auto; image-rendering: pixelated; background: #fff; }
+.terms { display: grid; gap: 4px; background: #fff; border: 1px solid var(--line); border-radius: 2px; padding: 8px 12px; }
+.term { display: grid; grid-template-columns: minmax(0, 1fr) 84px; gap: 8px; align-items: center; font-size: 13px; text-align: left; color: #363636; }
+.term .tv { display: grid; grid-template-columns: 1fr 32px; gap: 4px; align-items: center; }
+.term i { display: block; height: 8px; background: #8c8c8c; }
+.term b { font-weight: 400; text-align: right; }
+.cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.cells.v { grid-template-columns: 1fr; gap: 8px; }
+.cell { display: grid; place-items: center; height: 44px; font-size: 14px; color: #222; background: #fff; transition: opacity .2s; }
+.cell.best { font-weight: 600; }
+.cellkey { grid-row: 5; align-self: start; position: relative; top: -12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; text-align: center; color: var(--mute); font-size: 12px; margin-top: -8px; }
+.out { cursor: pointer; gap: 8px; max-width: 380px; }
+.resultwrap { max-width: 640px; }
+.out .row { display: grid; grid-template-columns: 72px minmax(0, 220px) 48px; justify-content: start; gap: 12px; align-items: center; height: 44px; font-size: 14px; color: #222; text-align: left; transition: opacity .2s; }
+.out .row .track { height: 12px; }
+.out .row .fill { display: block; height: 100%; background: #9a9a9a; }
+.out .row.win { font-weight: 600; } .out .row.win .fill { background: var(--head); }
+.out .row b { font-weight: inherit; text-align: right; }
+.resultwrap { grid-column: 4 / 7; grid-row: 5; align-self: start; display: grid; gap: 8px; padding-top: 8px; }
+.verdict { font-size: 40px; font-weight: 450; line-height: 1.1; color: var(--head); }
+.conf { font-size: 14px; color: var(--mute); }
+.conflict { margin-top: 8px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 4px; background: #fff; font-size: 14px; color: var(--para); line-height: 1.5; }
+.conflict b { display: block; color: var(--head); font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.outnote { font-size: 14px; color: var(--para); }
+.stale #rows, #result.stale { opacity: .35; }
+.off { opacity: .3; }
+.net.drawing .step { opacity: 0; transform: translateX(-8px); }
+.net.drawn .step { opacity: 1; transform: none; transition: opacity .45s var(--ease) var(--d, 0s), transform .45s var(--ease) var(--d, 0s); }
+.net.drawn .step.off { opacity: .3; }
+.net.drawing svg.wires path { stroke-dasharray: 700; stroke-dashoffset: 700; }
+.net.drawn svg.wires path { stroke-dasharray: 700; stroke-dashoffset: 0; transition: stroke-dashoffset .45s var(--ease) var(--d, 0s); }
+.net[data-cls] .cell:not(.k-active), .net[data-cls] .out .row:not(.k-active) { opacity: .2; }
+svg.wires { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
+svg.wires path { fill: none; stroke: var(--edge); stroke-width: 1; transition: stroke .2s; }
+svg.wires path.hot { stroke: #6b6b6b; stroke-width: 1.5; }
+.legend { max-width: 1360px; margin: 20px auto 0; display: flex; flex-wrap: wrap; gap: 8px 40px; align-items: flex-start; font-size: 12px; color: var(--text); }
+.scale { display: grid; gap: 2px; width: 200px; white-space: nowrap; }
+.scale .ramp { height: 8px; }
+.scale .ticks { display: flex; justify-content: space-between; }
+.legend .how { margin-left: auto; font-size: 14px; color: var(--mute); align-self: center; }
+.sw { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 12px; vertical-align: -1px; border-radius: 50%; }
+.sw:first-child { margin-left: 0; }
+.c-neg { background: var(--neg); fill: var(--neg); } .c-neu { background: var(--neu); fill: var(--neu); } .c-pos { background: var(--pos); fill: var(--pos); }
+
+/* Detail view */
+.detail { max-width: 1360px; margin: 24px auto 0; background: #fff; border: 1px solid var(--line); border-radius: 4px; }
+.detail header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 20px; border-bottom: 1px solid #ededed; }
+.detail header b { font-size: 20px; font-weight: 450; color: var(--head); }
+.detail .body { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 40px; padding: 20px; }
+.detail .body > * { min-width: 0; }
+.detail p { margin: 0 0 12px; max-width: 62ch; color: var(--para); line-height: 1.6; }
+.calc { width: 100%; border-collapse: collapse; font-size: 15px; }
+.calc th, .calc td { padding: 6px 12px; border-top: 1px solid #ededed; text-align: right; white-space: nowrap; }
+.calc th:first-child, .calc td:first-child { text-align: left; }
+.calc thead th { border-top: 0; border-bottom: 1px solid #b5b5b5; font-weight: 500; color: var(--mute); }
+.calc tr.total td { border-top: 1px solid #b5b5b5; font-weight: 600; color: #222; }
+.calc tr.dim td, .muted { color: var(--mute); }
+.push { display: grid; grid-template-columns: 1fr 1fr; align-items: center; min-width: 120px; }
+.push span { display: block; height: 10px; }
+.push .l { justify-self: end; } .push .r { justify-self: start; }
+.grow { transform-origin: left; }
+.push .l.grow { transform-origin: right; }
+.anim .grow { transform: scaleX(0); }
+.play .grow { transform: scaleX(1); transition: transform .7s var(--ease); }
+.anim .reveal { opacity: .15; }
+.play .reveal { opacity: 1; transition: opacity .4s var(--ease); }
+.stackbar { display: flex; height: 20px; background: #f2f2f2; }
+.stackbar span { display: block; height: 100%; border-right: 1px solid #fff; }
+.bigheat { width: 100%; image-rendering: pixelated; display: block; border: 1px solid var(--line); cursor: crosshair; }
+.readout { min-height: 1.6em; }
+.tbl { overflow-x: auto; }
+
+/* Article */
+#description { max-width: 826px; margin: 0 auto 80px; padding: 0 20px; }
+#description h2 { font-size: 40px; font-weight: 450; line-height: 1.5; color: var(--head); margin: 60px 0 12px; }
+#description h4 { font-size: 32px; font-weight: 450; line-height: 1.5; color: var(--head); margin: 44px 0 8px; }
+#description h6 { font-size: 24px; font-weight: 450; line-height: 1.5; color: var(--head); margin: 44px 0 8px; }
+#description p, #description li { font-size: 17px; line-height: 1.6; color: var(--para); }
+#description p { margin: 16px 0; }
+#description ol, #description ul { margin: 0; padding-left: 40px; }
+#description em { font-style: italic; }
+.figure { margin: 28px 0; }
+.figure svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.figure-caption { font-size: 13px; line-height: 1.6; color: var(--para); margin-top: 8px; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+.anim-fig { max-width: 600px; margin: 0 auto; padding: 16px 20px; background: var(--band); border: 1px solid #ededed; border-radius: 4px; }
+.figure:has(.anim-fig) .figure-caption { max-width: 600px; margin-inline: auto; }
+#fig-enc { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: center; }
+#fig-enc img { width: 168px; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 2px; }
+#fig-enc canvas { width: 240px; height: 120px; image-rendering: pixelated; }
+#fig-enc .arrow { font-size: 13px; color: var(--mute); text-align: center; }
+#fig-enc .arrow::after { content: ""; display: block; height: 1px; background: #9a9a9a; margin-top: 4px; }
+.fstep { font-size: 14px; font-weight: 600; color: #222; min-height: 21px; margin-bottom: 8px; }
+.frow { display: grid; grid-template-columns: 72px minmax(0, 1fr) 64px; gap: 12px; align-items: center; height: 28px; font-size: 14px; color: #363636; }
+.ftrack { position: relative; height: 12px; background: #ededed; }
+.ftrack i { position: absolute; top: 0; height: 100%; transition: left .6s var(--ease), width .6s var(--ease), background-color .3s; }
+.anim-fig.div .ftrack::after { content: ""; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: #8c8c8c; }
+.frow b { font-weight: 400; text-align: right; }
+.frow.hl { font-weight: 600; } .frow.hl b { font-weight: 600; }
+.fdots { display: flex; gap: 4px; margin-top: 8px; }
+.fdots i { width: 6px; height: 6px; border-radius: 50%; background: #d0d0d0; }
+.fdots i.on { background: #444; }
+.formula { text-align: center; font-size: 19px; color: #333; margin: 20px 0; font-family: "Times New Roman", Times, serif; font-style: italic; }
+.formula sub { font-size: 13px; }
+svg text { font-family: var(--font); fill: #363636; font-size: 13px; font-variant-numeric: tabular-nums; }
+svg .muted { fill: var(--mute); }
+svg .axis { stroke: #c4c4c4; stroke-width: 1; }
+svg .bin { fill: #d0d0d0; }
+table.std { width: 100%; border-collapse: collapse; font-size: 15px; color: var(--para); }
+table.std th, table.std td { padding: 8px 12px; border-top: 1px solid #ededed; text-align: right; vertical-align: top; }
+table.std td:not(:first-child) { white-space: nowrap; }
+table.std th:first-child, table.std td:first-child { text-align: left; }
+table.std thead th { font-weight: 500; color: var(--mute); border-top: 0; border-bottom: 1px solid #b5b5b5; }
+table.std b { font-weight: 600; color: #222; }
+
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .ftrack i { transition: none; } .play .grow, .play .reveal, .cell, .out .row { transition: none; } }
+@media (max-width: 900px) { .detail .body { grid-template-columns: minmax(0, 1fr); } .legend .how { margin-left: 0; } }
+@media (max-width: 699px) {
+  .net { grid-template-columns: minmax(0, 1fr); row-gap: 12px; max-width: 520px; }
+  .net > * { grid-column: 1 !important; grid-row: auto !important; }
+  .colhead { margin-top: 20px; text-align: left; }
+  .cellkey { margin-top: 0; }
+  svg.wires { display: none; }
+  .pair { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 700px) {
+  #header span { display: none; }
+  #description h2 { font-size: 30px; } #description h4 { font-size: 25px; } #description h6 { font-size: 21px; }
+  .verdict { font-size: 32px; }
+  table.std thead, table.calc thead { display: none; }
+  table.std tr, table.calc tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 12px; padding: 8px 0; border-top: 1px solid #ededed; }
+  table.std td, table.calc td { display: block; border: 0; padding: 0; text-align: left !important; white-space: normal; }
+  table.std td:first-child, table.calc td:first-child { grid-column: 1 / -1; font-weight: 600; }
+  table.std td::before, table.calc td::before { content: attr(data-label); display: block; color: var(--mute); font-size: 12px; font-weight: 400; }
+  table.std td:first-child::before, table.calc td:first-child::before { content: none; }
+  table.calc td:empty { display: none; }
+  .calc tr.total td { border: 0; }
+}
 </style>
 </head>
 <body>
-<main>
-  <h1>Multimodal Sentiment Demo</h1>
-  <p class="intro">Add a picture and its caption to see whether the post reads as positive, negative or neutral. Everything runs on this computer.</p>
 
-  <form id="form">
-    <div class="field">
-      <span class="field-label">Picture</span>
-      <div id="drop" tabindex="0" role="button" aria-label="Choose a picture, or drop one here">
-        <img id="preview" alt="The picture you chose">
-        <span id="prompt"><strong>Choose a picture</strong> or drop one here<br><span class="hint">JPG or PNG, under 20 MB</span></span>
+<div id="header"><b>Sentiment Explainer</b></div>
+
+<div class="control">
+  <img class="thumb" id="thumb" alt="">
+  <button class="btn" type="button" id="choose">Choose picture</button>
+  <input type="file" id="file" accept="image/*" hidden>
+  <button class="btn" type="button" id="remove">Remove</button>
+  <label for="caption">Caption</label>
+  <input id="caption" name="caption" type="text" autocomplete="off">
+  <button class="btn go" type="button" id="predict">Predict sentiment</button>
+  <span class="status" id="status" role="status"></span>
+  <span class="sp"></span>
+  <button class="btn" type="button" id="detailbtn" aria-pressed="true">Hide detail</button>
+</div>
+
+<div class="cnn" id="model">
+  <div class="net" id="net">
+    <svg class="wires" id="wires" aria-hidden="true"></svg>
+
+    <div class="colhead c1"><b>input</b><span>(224, 224, 3) · text</span></div>
+    <button class="node c1 r1" data-k="in-pic" type="button"><img id="pic" alt="" hidden><span class="empty" id="empty">no picture</span><span class="nl">picture</span></button>
+    <button class="node c1 r23" data-k="in-cap" type="button"><span class="capbox" id="capshow"></span><span class="nl">caption</span></button>
+
+    <div class="colhead c2"><b>encoders</b><span>(512) · (512) · (5000)</span></div>
+    <button class="node c2 r1" data-k="enc-image" type="button"><canvas class="heat" id="heat-image" width="32" height="16"></canvas><span class="nl">clip_image</span></button>
+    <button class="node c2 r2" data-k="enc-text" type="button"><canvas class="heat" id="heat-text" width="32" height="16"></canvas><span class="nl">clip_text</span></button>
+    <button class="node c2 r3" data-k="enc-words" type="button"><span class="terms" id="terms"></span><span class="nl">tfidf</span></button>
+
+    <div class="colhead c3"><b>logistic_regression</b><span>(3) each</span></div>
+    <button class="node c3 r1" data-k="lr-image" type="button"><span class="cells" id="p-image"></span><span class="nl">picture model</span></button>
+    <button class="node c3 r2" data-k="lr-text" type="button"><span class="cells" id="p-text"></span><span class="nl">caption model</span></button>
+    <button class="node c3 r3" data-k="lr-words" type="button"><span class="cells" id="p-words"></span><span class="nl">word model</span></button>
+    <span class="cellkey c3"><span>neg</span><span>neu</span><span>pos</span></span>
+
+    <div class="colhead c4"><b>mean</b><span>(3)</span></div>
+    <button class="node c4 r13" data-k="mean" type="button"><span class="cells v" id="p-mean"></span></button>
+
+    <div class="colhead c5"><b>rescale</b><span>neutral × 0.75</span></div>
+    <button class="node c5 r13" data-k="scale" type="button"><span class="cells v" id="p-final"></span></button>
+
+    <div class="colhead c6"><b>output</b><span>(3)</span></div>
+    <button class="node out c6 r13" data-k="out" type="button"><span id="rows" style="display:grid;gap:8px"></span></button>
+
+    <div class="resultwrap">
+      <div id="result">
+        <div class="verdict" id="verdict"></div>
+        <div class="conf" id="conf"></div>
+        <div class="conflict" id="conflict" hidden></div>
       </div>
-      <input id="file" type="file" accept="image/*" hidden>
-      <button id="remove" type="button">Remove picture</button>
+      <div class="outnote" id="outnote" hidden></div>
     </div>
-    <div class="field">
-      <label for="text">Caption</label>
-      <textarea id="text" placeholder="What does the post say?"></textarea>
-    </div>
-    <button id="predict" type="submit">Predict sentiment</button>
-    <p id="error" role="alert"></p>
-  </form>
+  </div>
 
-  <section id="result" aria-live="polite">
-    <p class="eyebrow">Prediction</p>
-    <p id="label"></p>
-    <p id="score"></p>
-    <p id="confidence"><strong></strong><span></span></p>
-    <div id="bars"></div>
-    <div id="readings">
-      <p class="eyebrow">What each part says on its own</p>
-      <div id="reading-rows"></div>
-      <p id="conflict"><strong>Possible sarcasm or mixed message.</strong> The caption and the picture point in opposite directions, so the overall result is less reliable.</p>
-    </div>
-    <p id="note"></p>
-  </section>
-</main>
+  <div class="legend">
+    <div class="scale"><span class="ramp" id="ramp"></span><span class="ticks"><span>−2.5</span><span>0.0</span><span>2.5</span></span><span>embedding value, standardised</span></div>
+    <div class="scale"><span class="ramp" id="ramp2"></span><span class="ticks"><span>0.0</span><span>0.5</span><span>1.0</span></span><span>probability</span></div>
+    <span class="how" id="howto">Hover a class to trace it through the model. Click any step to see its maths</span>
+  </div>
+
+  <div class="detail" id="detail" aria-live="polite"></div>
+</div>
+
+<div id="description">
+  <h2>What is multimodal sentiment analysis?</h2>
+  <p>Sentiment analysis assigns a feeling to a piece of content: <em>negative</em>, <em>neutral</em> or <em>positive</em>. A social media post usually has two parts, a picture and a caption, and each can carry its own feeling. A <em>multimodal</em> model reads both parts and combines what it finds. This matters most when the parts disagree: a cheerful picture under a gloomy caption can be sarcasm, and the page flags it when it happens.</p>
+  <p>The model on this page was trained on MVSA-Single, a set of Twitter posts where people labelled the text and the image separately. It is built from a few simple parts:</p>
+  <ol>
+    <li>An <strong>encoder</strong> turns a picture or a caption into a list of numbers called an embedding. This model uses CLIP ViT-B/32, a network trained to match pictures with their captions. It is kept frozen: none of its weights are changed here.</li>
+    <li>A <strong>classifier</strong> turns an embedding into three probabilities, one per class. Each classifier here is a logistic regression.</li>
+    <li><strong>Fusion</strong> combines the classifiers. This model uses late fusion: each classifier decides on its own and only the probabilities are averaged.</li>
+    <li>A <strong>class score</strong> is a probability between 0 and 1. The three scores always sum to 1, and the highest one is the prediction.</li>
+  </ol>
+
+  <h2>What does each step of the model do?</h2>
+  <p>Click a step in the diagram above while you read. Each one opens a worked example with this post's own numbers.</p>
+
+  <h4>Input</h4>
+  <p>The picture and the caption stay separate from start to finish. The picture is resized and centre-cropped to 224 × 224 pixels with three colour channels, the size CLIP was trained on. The caption is cleaned the way the training tweets were: links are removed, @mentions are replaced, hashtags are split into words and emoji are written as words. Words written inside a picture are not read out; only the picture encoder sees them.</p>
+
+  <h4>CLIP encoders</h4>
+  <p>CLIP's vision transformer turns the picture into 512 numbers, and its text transformer does the same for the caption. In the diagram each embedding is drawn as a 32 × 16 grid. A cell is red when that value is below the training average and blue when it is above. Because CLIP learned to place a picture near its caption, the two embeddings live in comparable spaces, which the agreement section below uses.</p>
+  <div class="figure"><div class="anim-fig" id="fig-enc"><img id="fig-enc-img" alt=""><span class="arrow" id="fig-enc-arrow">CLIP image encoder</span><canvas id="fig-enc-cv" width="320" height="160"></canvas></div><div class="figure-caption">Figure 1. A CLIP encoder turns its input into 512 values, filled in here in reading order. Red is below the training average, blue above.</div></div>
+
+  <h4>Word features</h4>
+  <p>The caption is also counted word by word. TF-IDF scores each word and word pair by how often it appears in this caption and how rare it is across all training captions, using a 5,000-term vocabulary. This gives the model a direct view of sentiment words such as "happy", which a general-purpose embedding can blur.</p>
+
+  <h4>Logistic regression</h4>
+  <p>Three classifiers work side by side, one per encoder output. Each multiplies every input value by a learned weight, adds the products, and gets one score per class. Strong regularisation (C = 0.001) keeps every weight on the CLIP embeddings small, so no single dimension decides.</p>
+  <div class="figure"><div class="anim-fig" id="fig-lr"></div><div class="figure-caption">Figure 2. One model's three class scores build up as each value × weight is added: the eight strongest dimensions first, then the other 504 together, then the constant.</div></div>
+  <h6>Softmax</h6>
+  <div class="formula">p<sub>k</sub> = exp(z<sub>k</sub>) / (exp(z<sub>neg</sub>) + exp(z<sub>neu</sub>) + exp(z<sub>pos</sub>))</div>
+  <p>Softmax turns the three scores z into probabilities that sum to 1. A class with a much higher score than the others takes nearly all the probability; three similar scores give three similar probabilities.</p>
+  <div class="figure"><div class="anim-fig" id="fig-soft"></div><div class="figure-caption">Figure 3. Softmax on that model's scores: each score is exponentiated, then divided by the sum of the three.</div></div>
+
+  <h4>Late fusion</h4>
+  <p>The three classifiers vote with their probabilities, and each vote counts equally. The mean of the three is the fused reading. Late fusion keeps the picture and the caption as separate judgements, so a strong picture cannot hide a contradicting caption inside one shared vector.</p>
+  <div class="figure"><div class="anim-fig" id="fig-fuse"></div><div class="figure-caption">Figure 4. Late fusion: the three models' probabilities, one model at a time, and then their mean.</div></div>
+  <h6>Rescaling neutral</h6>
+  <p>Before the final answer, the neutral probability is multiplied by 0.75 and the three are rescaled to sum to 1. The factor was chosen by cross-validation on the training and validation posts. It trades some neutral recall for fewer false neutrals, which raised both accuracy and macro-F1.</p>
+  <div class="figure"><div class="anim-fig" id="fig-scale"></div><div class="figure-caption">Figure 5. Rescaling: the neutral probability is multiplied by 0.75, then all three are divided by their new sum.</div></div>
+
+  <h2>Do the caption and the picture agree?</h2>
+  <p>A sarcastic or mixed post shows up as disagreement between what the caption says and what the picture shows. CLIP places a caption close to its picture when the caption describes it, so their cosine similarity measures fit.</p>
+  <div class="figure"><svg id="hist" role="img" aria-label="Caption–picture similarity across training posts"></svg><div class="figure-caption" id="histcap"></div></div>
+  <p>Two further models read each part alone: a caption-only model trained on the text labels and a picture-only model trained on the image labels. Jensen–Shannon divergence compares their readings, from 0 bits when they match to 1 bit when they share nothing. Entropy measures how undecided a reading is, from 0 bits when one class takes everything to 1.585 bits when all three are equal.</p>
+  <div class="figure tbl"><table class="std" id="measures"><thead><tr><th>Measure</th><th>This post</th><th>Range</th></tr></thead><tbody></tbody></table></div>
+
+  <h2>Where does this post sit among the training posts?</h2>
+  <p>Principal component analysis projects each 512-value CLIP space onto the two directions along which training posts vary most. Each point is a training post, coloured by the human label for that part. The cross marks this post.</p>
+  <div class="figure"><div class="pair"><svg id="mapT" role="img" aria-label="Caption embedding map"></svg><svg id="mapI" role="img" aria-label="Picture embedding map"></svg></div><div class="figure-caption" id="mapcap"></div></div>
+
+  <h2>Which words moved the word model?</h2>
+  <p>The word model is linear, so its decision splits exactly into one contribution per term: the term's weight in the caption times what the model learned for it. Each bar is the push towards positive minus the push towards negative.</p>
+  <div class="figure"><svg id="wordbars" role="img" aria-label="Word contributions"></svg>
+    <div class="figure-caption" id="wordcap"></div></div>
+
+  <h2>How reliable is the prediction?</h2>
+  <p>The model was scored once on 447 held-out test posts that played no part in training or in choosing settings. A post is neutral only when both its text and its image are neutral; posts whose text and image point in opposite directions have no single label and are left out. The main reported model scores 0.696 accuracy and 0.603 macro-F1. This page runs the follow-up model chosen by cross-validation, which scores 0.761 and 0.643.</p>
+  <div class="figure"><svg id="cm" role="img" aria-label="Confusion matrix"></svg><div class="figure-caption">Figure 9. Test confusion matrix: 340 of 447 posts right (76.1%). Most errors confuse positive and negative.</div></div>
+  <div class="figure tbl"><table class="std"><thead><tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th><th>Posts</th></tr></thead>
+    <tbody><tr><td>Negative</td><td>0.656</td><td>0.739</td><td>0.695</td><td>134</td></tr><tr><td>Neutral</td><td>0.481</td><td>0.333</td><td>0.394</td><td>39</td></tr>
+    <tr><td>Positive</td><td>0.848</td><td>0.832</td><td>0.840</td><td>274</td></tr><tr><td><b>Macro average</b></td><td>0.662</td><td>0.635</td><td><b>0.643</b></td><td>447</td></tr></tbody></table></div>
+  <h6>Confidence</h6>
+  <p>The score of the winning class is sorted into three levels. The table shows how often predictions at each level were right on 446 validation posts. Always answering "positive" would be right 61.3% of the time, with macro-F1 0.253.</p>
+  <div class="figure tbl"><table class="std"><thead><tr><th>Confidence</th><th>Share of posts</th><th>Right</th></tr></thead>
+    <tbody><tr><td>High, 0.70 or more</td><td>14.6%</td><td>95.4%</td></tr><tr><td>Medium, 0.45 to 0.70</td><td>63.7%</td><td>71.8%</td></tr><tr><td>Low, below 0.45</td><td>21.7%</td><td>51.5%</td></tr></tbody></table></div>
+
+  <h2>Interactive features</h2>
+  <ol>
+    <li><strong>Choose a picture</strong> (or drop one anywhere on the page) <strong>and type a caption</strong> in the row at the top, then press Predict sentiment to watch the model run from left to right.</li>
+    <li><strong>Remove the picture</strong> to see the caption judged on its own.</li>
+    <li><strong>Hover a class</strong> in the output column to trace it back through every step.</li>
+    <li><strong>Click any step</strong> to open its worked example, and press Replay to run it again.</li>
+    <li><strong>Point at a cell</strong> in an open embedding to read that dimension's value.</li>
+  </ol>
+
+  <h2>How is this page implemented?</h2>
+  <p>The embeddings come from a frozen CLIP ViT-B/32. The classifiers are scikit-learn logistic regressions, saved as plain weight arrays. The page is a single HTML file with no libraries, served by a small Python standard-library server that runs the model and returns the numbers drawn here.</p>
+</div>
 
 <script>
-  const $ = id => document.getElementById(id);
-  const MAX_BYTES = 20 * 1024 * 1024;
-  let imageData = null;
+const C = ["negative", "neutral", "positive"], K = ["neg", "neu", "pos"];
+const NEG = [178, 24, 43], POS = [33, 102, 172];
+const $ = id => document.getElementById(id);
+const f3 = x => x.toFixed(3), sg = x => (x < 0 ? "−" : "+") + Math.abs(x).toFixed(3);
+const NS = "http://www.w3.org/2000/svg";
+function el(p, tag, a = {}, text) { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (text != null) e.textContent = text; p.append(e); return e; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const touch = matchMedia("(hover: none)").matches;
+const net = $("net");
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
-  function showError(message) {
-    $("error").textContent = message;
-    $("error").style.display = message ? "block" : "none";
+// The current prediction (D), its three models (B) and the two separate readings (R), as sent by the server
+let D = null, B = {}, R = {};
+// The chosen picture: null, the example post's ({kind: "example", url}), or an upload ({kind: "upload", data})
+let picture = null;
+let sel = "lr-image", zf = 1, timers = [], wordNote = "";
+
+// ---------- Small drawing helpers ----------
+function heat(canvas, v, mark = []) {
+  const ctx = canvas.getContext("2d"), w = canvas.width / 32, img = ctx.createImageData(canvas.width, canvas.height);
+  for (let i = 0; i < 512; i++) {
+    const x = v ? v[i] : null, t = x == null ? 0 : Math.min(1, Math.abs(x) / 2.5), end = x < 0 ? NEG : POS;
+    const rgb = x == null ? [236, 236, 236] : [0, 1, 2].map(k => Math.round(250 + (end[k] - 250) * t));
+    const cx = i % 32, cy = Math.floor(i / 32);
+    for (let yy = 0; yy < w; yy++) for (let xx = 0; xx < w; xx++) img.data.set([...rgb, 255], ((cy * w + yy) * canvas.width + cx * w + xx) * 4);
   }
+  ctx.putImageData(img, 0, 0);
+  ctx.strokeStyle = "#222"; ctx.lineWidth = Math.max(1, w / 7);
+  mark.forEach(i => ctx.strokeRect((i % 32) * w + ctx.lineWidth / 2, Math.floor(i / 32) * w + ctx.lineWidth / 2, w - ctx.lineWidth, w - ctx.lineWidth));
+}
+function cells(id, p) {
+  if (!p) { $(id).innerHTML = K.map(k => `<span class="cell k-${k}">–</span>`).join(""); return; }
+  const best = p.indexOf(Math.max(...p));
+  $(id).innerHTML = p.map((v, i) => { const a = (0.04 + 0.46 * v).toFixed(3);
+    return `<span class="cell k-${K[i]}${i === best ? " best" : ""}" style="background:linear-gradient(rgba(40,40,40,${a}),rgba(40,40,40,${a})),#fff" title="${C[i]} ${f3(v)}">${f3(v)}</span>`; }).join("");
+}
+const level = x => x >= 0.70 ? "high" : x >= 0.45 ? "medium" : "low";
+const RATE = { high: "95%", medium: "72%", low: "52%" };   // how often each level was right on validation posts
+const nodeOf = k => net.querySelector(`[data-k="${k}"]`);
+$("ramp").style.background = `linear-gradient(90deg, rgb(${NEG}), #fafafa, rgb(${POS}))`;
+$("ramp2").style.background = "linear-gradient(90deg, rgba(40,40,40,.04), rgba(40,40,40,.5))";
+if (touch) $("howto").textContent = "Tap a class to trace it; tap it again to clear. Tap any step to see its maths";
 
-  function clearImage() {
-    imageData = null;
-    $("file").value = "";
-    $("preview").removeAttribute("src");
-    $("preview").style.display = "none";
-    $("prompt").style.display = "";
-    $("remove").style.display = "none";
+// ---------- Which steps have something to show for the current input ----------
+const NEEDS = { "in-pic": "a picture", "enc-image": "a picture", "lr-image": "a picture", "in-cap": "a caption", "enc-text": "a caption", "lr-text": "a caption",
+  "enc-words": "a caption", "lr-words": "a caption", mean: "both a picture and a caption", scale: "both a picture and a caption" };
+const NAMES = { "in-pic": "The picture", "in-cap": "The caption", "enc-image": "CLIP image embedding", "enc-text": "CLIP text embedding", "enc-words": "TF-IDF word features",
+  "lr-image": "Picture model", "lr-text": "Caption model", "lr-words": "Word model", mean: "Late fusion: the mean of three", scale: "Rescaling neutral", out: "The prediction" };
+function avail(k) {
+  if (!D) return false;
+  return { "in-pic": !!picture, "in-cap": !!D.caption, "enc-image": !!B.image, "lr-image": !!B.image, "enc-text": !!B.text, "lr-text": !!B.text,
+    "enc-words": !!B.words, "lr-words": !!B.words, mean: !!D.average, scale: !!D.average, out: true }[k];
+}
+
+// ---------- Draw one prediction ----------
+function render(d) {
+  D = d; B = D.branches; R = D.readings;
+  const both = !!D.average;
+  $("capshow").textContent = D.caption || "no caption";
+  heat($("heat-image"), B.image && B.image.z); heat($("heat-text"), B.text && B.text.z);
+  const top = D.terms.slice(0, 4), tmax = Math.max(...top.map(t => t.w), 0.001);
+  $("terms").innerHTML = top.length ? top.map(t => `<span class="term"><span>${esc(t.term)}</span><span class="tv"><i style="width:${t.w / tmax * 100}%"></i><b>${t.w.toFixed(2)}</b></span></span>`).join("")
+    : `<span class="term"><span>${D.caption ? "no known words" : "no caption"}</span></span>`;
+  cells("p-image", B.image && B.image.proba); cells("p-text", B.text && B.text.proba); cells("p-words", B.words && B.words.proba);
+  cells("p-mean", D.average); cells("p-final", both ? D.final : null);
+  // With one input, the answer comes from that part's own reading, so the fusion chain is dimmed
+  ["enc-image", "enc-text", "enc-words", "lr-image", "lr-text", "lr-words", "mean", "scale"].forEach(k =>
+    nodeOf(k).classList.toggle("off", !avail(k) || (!both && !k.startsWith("enc-")) || (!both && k === "enc-words")));
+  showOutput(D.final, `score ${f3(D.score)} · ${D.confidence} confidence` + (both ? `, right ${RATE[D.confidence]} of the time at this level` : ""));
+  $("conflict").hidden = !D.conflict;
+  if (D.conflict) {
+    const win = D.final.indexOf(Math.max(...D.final));
+    const favour = [["picture", B.image.proba], ["caption", B.text.proba], ["word", B.words.proba]].filter(([, p]) => p.indexOf(Math.max(...p)) === win);
+    $("conflict").innerHTML = `<b>Possible sarcasm or a mixed message</b>A caption-only model, trained on text labels, reads ${R.text.label} (${f3(Math.max(...R.text.proba))}). A picture-only model, trained on image labels, reads ${R.image.label} (${f3(Math.max(...R.image.proba))}). In the chain, ${favour.length} of 3 models favour ${D.label} (${favour.map(([n, p]) => `${n} ${f3(p[win])}`).join(", ")}), so the result is ${D.label}.`;
   }
-
-  function setImage(file) {
-    if (!file) return;
-    showError("");
-    if (file.size > MAX_BYTES) return showError("That image is too large. Please use one under 20 MB.");
-    const reader = new FileReader();
-    reader.onload = () => {
-      imageData = reader.result;
-      $("preview").src = imageData;
-      $("preview").style.display = "block";
-      $("prompt").style.display = "none";
-      $("remove").style.display = "inline";
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function showResult(result) {
-    $("label").textContent = result.label;
-    $("score").textContent = `Score ${result.score.toFixed(3)}`;
-    const levels = {
-      high: ["High confidence", "Predictions this confident were right about 95% of the time on validation posts."],
-      medium: ["Medium confidence", "Treat this as a likely answer. Predictions in this range were right about 72% of the time."],
-      low: ["Low confidence", "Treat this as a guess. Predictions this unsure were right only about half the time."],
-    };
-    const [title, detail] = levels[result.confidence];
-    $("confidence").className = result.confidence;
-    $("confidence").querySelector("strong").textContent = title;
-    const alone = {
-      high: "Readings this confident were right about 80% (caption) to 91% (picture) of the time on validation posts.",
-      medium: "Treat this as a likely answer. Readings in this range were right about 62% of the time.",
-      low: "Treat this as a guess. Readings this unsure were right less than 40% of the time.",
-    };
-    $("confidence").querySelector("span").textContent = result.used.length === 2 ? detail : alone[result.confidence];
-    const readings = Object.entries(result.readings || {});
-    $("readings").style.display = readings.length === 2 ? "block" : "none";
-    $("reading-rows").replaceChildren(...readings.map(([part, r]) => {
-      const row = document.createElement("div");
-      row.className = "reading";
-      const what = document.createElement("span");
-      what.className = "what";
-      what.textContent = `${part === "text" ? "Caption" : "Picture"}: ${r.label}`;
-      const score = document.createElement("span");
-      score.className = "muted";
-      score.textContent = `${r.score.toFixed(3)} · ${r.confidence} confidence`;
-      row.append(what, score);
-      return row;
-    }));
-    $("conflict").style.display = result.conflict ? "block" : "none";
-    const rows = Object.entries(result.probabilities).sort((a, b) => b[1] - a[1]);
-    $("bars").replaceChildren(...rows.map(([name, value]) => {
-      const row = document.createElement("div");
-      row.className = "row" + (name === result.label ? " top" : "");
-      const label = document.createElement("span");
-      label.textContent = name;
-      const track = document.createElement("div");
-      track.className = "track";
-      const fill = document.createElement("div");
-      fill.className = "fill";
-      fill.style.width = `${(value * 100).toFixed(1)}%`;
-      track.append(fill);
-      const number = document.createElement("span");
-      number.className = "value";
-      number.textContent = value.toFixed(3);
-      row.append(label, track, number);
-      return row;
-    }));
-    $("note").textContent = result.used.length === 2
-      ? "The score is the model's probability for this class, not a guarantee. The overall model is right on about 76% of test posts, and neutral is its weakest class."
-      : `This judged the ${result.used[0] === "text" ? "caption" : "picture"} on its own, using a model trained on ${result.used[0]} labels. The score is its probability for this class, not a guarantee.`;
-    $("result").style.display = "block";
-    $("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-
-  $("drop").addEventListener("click", () => $("file").click());
-  $("drop").addEventListener("keydown", e => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); }
+  markStale(false);
+  if (!both) { $("outnote").hidden = false;
+    $("outnote").textContent = B.text ? "Caption only: read by the caption-only model, trained on text labels. Fusion needs both inputs."
+      : "Picture only: read by the picture-only model, trained on image labels. Fusion needs both inputs."; }
+  const netPush = D.terms.map(t => [t.term, t.push[2] - t.push[0]]).sort((a, b) => b[1] - a[1]);
+  wordNote = !netPush.length ? "" : `The strongest push towards positive comes from "${netPush[0][0]}" (${sg(netPush[0][1])})`
+    + (netPush.at(-1)[1] < 0 ? `, and the strongest towards negative from "${netPush.at(-1)[0]}" (${sg(netPush.at(-1)[1])}).` : ". No term in this caption pushes towards negative.");
+  trace(null); open(sel, false); drawPlots(); figures(); wires();
+}
+function showOutput(p, confText) {
+  const w = p.indexOf(Math.max(...p)), lab = C[w];
+  $("verdict").textContent = lab[0].toUpperCase() + lab.slice(1);
+  $("conf").textContent = confText;
+  $("rows").innerHTML = C.map((c, i) => `<span class="row k-${K[i]}${i === w ? " win" : ""}" data-cls="${K[i]}"><span>${c}</span><span class="track"><span class="fill" style="width:${p[i] * 100}%"></span></span><b>${f3(p[i])}</b></span>`).join("");
+  document.querySelectorAll(".out .row").forEach(r => {
+    r.addEventListener("mouseenter", () => { if (!touch) trace(r.dataset.cls); });
+    r.addEventListener("mouseleave", () => { if (!touch) trace(null); });
+    r.addEventListener("click", e => { if (touch) { e.stopPropagation(); trace(net.dataset.cls === r.dataset.cls ? null : r.dataset.cls); } });
   });
-  $("file").addEventListener("change", e => setImage(e.target.files[0]));
-  $("remove").addEventListener("click", clearImage);
-  ["dragover", "dragenter"].forEach(type => $("drop").addEventListener(type, e => { e.preventDefault(); $("drop").classList.add("over"); }));
-  ["dragleave", "drop"].forEach(type => $("drop").addEventListener(type, e => { e.preventDefault(); $("drop").classList.remove("over"); }));
-  $("drop").addEventListener("drop", e => setImage(e.dataTransfer.files[0]));
+}
+function markStale(stale) {
+  nodeOf("out").classList.toggle("stale", stale); $("result").classList.toggle("stale", stale);
+  $("outnote").hidden = !stale; if (stale) $("outnote").textContent = "From the previous input. Press Predict sentiment to update.";
+}
 
-  $("form").addEventListener("submit", async e => {
-    e.preventDefault();
-    showError("");
-    const text = $("text").value;
-    if (!imageData && !text.trim()) return showError("Add a picture, a caption, or both.");
-    $("predict").disabled = true;
-    $("predict").textContent = "Predicting...";
-    $("result").style.display = "none";
-    try {
-      const response = await fetch("/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, image: imageData }),
-      });
-      const content = await response.json();
-      if (!response.ok) throw new Error(content.error);
-      showResult(content);
-    } catch (err) {
-      showError(err instanceof TypeError ? "Couldn't reach the model. Is the app still running in Terminal?" : err.message);
-    } finally {
-      $("predict").disabled = false;
-      $("predict").textContent = "Predict sentiment";
-    }
+// Trace a class through every column
+function trace(cls) {
+  document.querySelectorAll(".k-active").forEach(x => x.classList.remove("k-active"));
+  if (!cls) { delete net.dataset.cls; return; }
+  net.dataset.cls = cls; document.querySelectorAll(".k-" + cls).forEach(x => x.classList.add("k-active"));
+}
+
+// Curved connectors
+const LINKS = [["in-pic", "enc-image"], ["in-cap", "enc-text"], ["in-cap", "enc-words"], ["enc-image", "lr-image"], ["enc-text", "lr-text"], ["enc-words", "lr-words"],
+  ["lr-image", "mean"], ["lr-text", "mean"], ["lr-words", "mean"], ["mean", "scale"], ["scale", "out"]];
+const COLOF = { "enc-image": 1, "enc-text": 1, "enc-words": 1, "lr-image": 2, "lr-text": 2, "lr-words": 2, mean: 3, scale: 4, out: 5 };
+// Narrow windows keep the whole diagram in view by scaling it, as a zoomed-out page would
+function fit() { zf = innerWidth >= 700 ? Math.min(1, (innerWidth - 40) / 1320) : 1; net.style.zoom = zf; net.style.width = zf < 1 ? "1320px" : ""; }
+function wires() {
+  const svg = $("wires"); if (getComputedStyle(svg).display === "none") return;
+  const box = net.getBoundingClientRect(); svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`); svg.style.width = box.width / zf + "px"; svg.style.height = box.height / zf + "px";
+  const r = k => [...nodeOf(k).children].map(c => c.getBoundingClientRect()).find(b => b.width > 0);
+  const mid = q => q.top + q.height / 2 - box.top;
+  const parts = k => [...nodeOf(k).querySelectorAll(k === "out" ? ".row" : ".cell")].map(e => e.getBoundingClientRect());
+  const paths = [];
+  LINKS.forEach(([a, b]) => {
+    const A = r(a), Bq = r(b); if (!A || !Bq) return;
+    const hot = a === sel || b === sel ? "hot" : "", dl = `--d:${Math.max(0, COLOF[b] * 220 - 160)}ms`;
+    const x1 = A.right - box.left + 6 * zf, x2 = Bq.left - box.left - 6 * zf, mx = (x1 + x2) / 2;
+    let ys = [[mid(A), mid(Bq)]];
+    if (b === "mean") ys = parts("mean").map(c => [mid(A), mid(c)]);
+    else if (a === "mean" || a === "scale") { const pa = parts(a), pb = parts(b); ys = pa.map((c, i) => [mid(c), mid(pb[i])]); }
+    ys.forEach(([y1, y2]) => paths.push(`<path style="${dl}" class="${hot}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`));
   });
+  // Update existing paths in place, so a redraw during the Predict animation keeps their transitions
+  const tmp = document.createElementNS(NS, "svg"); tmp.innerHTML = paths.join("");
+  const fresh = [...tmp.children], old = [...svg.children];
+  if (old.length !== fresh.length) { svg.replaceChildren(...fresh); return; }
+  fresh.forEach((f, i) => { ["d", "class", "style"].forEach(k => { const v = f.getAttribute(k); if (old[i].getAttribute(k) !== v) old[i].setAttribute(k, v); }); });
+}
+
+// ---------- Detail: each step worked through ----------
+function pushCell(v, m) { const w = Math.min(1, Math.abs(v) / m) * 100;
+  return `<td><span class="push"><span class="l grow" style="width:${v < 0 ? w : 0}%;background:var(--neg)"></span><span class="r grow" style="width:${v > 0 ? w : 0}%;background:var(--pos)"></span></span></td>`; }
+function lrDetail(key, name, enc) {
+  const b = B[key], m = Math.max(...b.top.flatMap(t => t.push.map(Math.abs)));
+  const rows = b.top.map(t => `<tr class="reveal"><td>dimension ${t.dim} <span class="muted">(${t.z < 0 ? "−" : "+"}${Math.abs(t.z).toFixed(2)})</span></td>${t.push.map(v => `<td>${sg(v)}</td>`).join("")}${pushCell(t.push[2] - t.push[0], m)}</tr>`).join("");
+  return { title: `${name}: from ${enc} to probabilities`,
+    text: `<p>The 512 values are first standardised with the training set's mean and spread. Each class gets a score: every value times its learned weight, summed, plus a constant. The table shows the eight dimensions that push hardest on this model's winning class, then the other 504 together.</p><p>Softmax turns the three scores into probabilities that sum to 1. Strong regularisation (C = 0.001) keeps every weight small, so no single dimension decides.</p>`,
+    side: `<div class="tbl"><table class="calc"><thead><tr><th>Term</th><th>neg</th><th>neu</th><th>pos</th><th>pos − neg</th></tr></thead><tbody>${rows}
+      <tr class="dim reveal"><td>504 other dimensions</td>${b.rest.map(v => `<td>${sg(v)}</td>`).join("")}<td></td></tr>
+      <tr class="dim reveal"><td>constant</td>${b.intercept.map(v => `<td>${sg(v)}</td>`).join("")}<td></td></tr>
+      <tr class="total reveal"><td>score z</td>${b.logits.map(v => `<td>${sg(v)}</td>`).join("")}<td></td></tr>
+      <tr class="total reveal"><td>softmax p</td>${b.proba.map(v => `<td>${f3(v)}</td>`).join("")}<td></td></tr></tbody></table></div>` };
+}
+function encDetail(key, title, text) {
+  return { title, text: `<p>${text}</p><p class="readout" id="readout">Point at a cell to read its value.</p>`, side: `<canvas class="bigheat" id="bigheat" width="${32 * 21}" height="${16 * 21}" data-key="${key}"></canvas>` };
+}
+const DETAIL = {
+  "in-pic": () => ({ title: "The picture", text: `<p>The picture is resized and centre-cropped to 224 × 224 pixels, the size CLIP was trained on. Nothing else is done to it. Words written inside a picture stay part of the picture: only the picture encoder sees them.</p>`, side: $("pic").hidden ? "" : `<img src="${$("pic").src}" alt="" style="width:100%;max-width:520px;display:block">` }),
+  "in-cap": () => ({ title: "The caption", text: `<p>The caption is cleaned as the training tweets were: links removed, @mentions replaced, hashtags split into words, emoji written as words. The same cleaned text goes to CLIP's text encoder and to the word counter.</p>`,
+    side: `<table class="calc"><tbody><tr><td>typed</td><td style="text-align:left;white-space:normal">${esc(D.caption)}</td></tr><tr><td>words counted</td><td style="text-align:left;white-space:normal">${esc(D.tokens.join(" · "))}</td></tr></tbody></table>` }),
+  "enc-image": () => encDetail("image", "CLIP image embedding", "CLIP's vision transformer turns the picture into 512 numbers. Each cell is one of them after standardising, as the classifier sees it: red below the training average, blue above. Outlined cells are the eight that push hardest on the picture model's decision."),
+  "enc-text": () => encDetail("text", "CLIP text embedding", "CLIP's text transformer reads the cleaned caption and also returns 512 numbers. CLIP was trained to match pictures with their captions, so the two embeddings live in comparable spaces. Outlined cells are the eight that push hardest on the caption model's decision."),
+  "enc-words": () => ({ title: "TF-IDF word features", text: `<p>The caption's words and word pairs are counted against a 5,000-term vocabulary learned from training captions. Each count becomes 1 + log(count), is multiplied by how rare the term is across captions, and the vector is scaled to length 1. Unknown words are ignored.</p>`,
+    side: `<table class="calc"><thead><tr><th>Term</th><th>weight</th></tr></thead><tbody>${D.terms.map(t => `<tr class="reveal"><td>${esc(t.term)}</td><td>${f3(t.w)}</td></tr>`).join("")}</tbody></table>` }),
+  "lr-image": () => lrDetail("image", "Picture model", "the picture's 512 values"),
+  "lr-text": () => lrDetail("text", "Caption model", "the caption's 512 values"),
+  "lr-words": () => { const m = Math.max(...D.terms.map(t => Math.abs(t.push[2] - t.push[0])), 0.001);
+    return { title: "Word model: from word weights to probabilities", text: `<p>Each term's weight is multiplied by what the model learned for that term, separately for each class. Because the model is linear, these pushes add up exactly to the class scores.</p><p>${esc(wordNote)}</p>`,
+      side: `<div class="tbl"><table class="calc"><thead><tr><th>Term</th><th>neg</th><th>neu</th><th>pos</th><th>pos − neg</th></tr></thead><tbody>${D.terms.map(t => `<tr class="reveal"><td>${esc(t.term)}</td>${t.push.map(v => `<td>${sg(v)}</td>`).join("")}${pushCell(t.push[2] - t.push[0], m)}</tr>`).join("")}
+      <tr class="dim reveal"><td>constant</td>${B.words.intercept.map(v => `<td>${sg(v)}</td>`).join("")}<td></td></tr>
+      <tr class="total reveal"><td>score z</td>${B.words.logits.map(v => `<td>${sg(v)}</td>`).join("")}<td></td></tr>
+      <tr class="total reveal"><td>softmax p</td>${B.words.proba.map(v => `<td>${f3(v)}</td>`).join("")}<td></td></tr></tbody></table></div>` }; },
+  "mean": () => ({ title: "Late fusion: the mean of three", text: `<p>Each model votes with its probabilities, and the three votes count equally. The picture and the caption are judged separately and only their conclusions are combined, which is late fusion.</p><p>Each bar is one class's mean, built from a third of each model's probability.</p>`,
+    side: C.map((c, i) => `<div style="display:grid;grid-template-columns:80px minmax(0,1fr) 56px;gap:12px;align-items:center;margin-bottom:12px"><span>${c}</span><span class="stackbar">${[["image", "picture"], ["text", "caption"], ["words", "words"]].map(([k, n], j) => `<span class="grow" title="${n} ${f3(B[k].proba[i] / 3)}" style="width:${B[k].proba[i] / 3 * 100}%;background:rgba(60,60,60,${[.8, .5, .25][j]})"></span>`).join("")}</span><span style="text-align:right">${f3(D.average[i])}</span></div>`).join("")
+      + `<p class="muted" style="font-size:14px">Shades, darkest first: picture, caption, words</p>` }),
+  "scale": () => ({ title: "Rescaling neutral", text: `<p>The neutral probability is multiplied by 0.75 and the three are rescaled to sum to 1. The factor was chosen by cross-validation on training and validation posts: it trades some neutral recall for fewer false neutrals, which raised accuracy and macro-F1.</p>`,
+    side: `<table class="calc"><thead><tr><th>Step</th><th>neg</th><th>neu</th><th>pos</th><th>sum</th></tr></thead><tbody>
+      <tr class="reveal"><td>mean</td>${D.average.map(v => `<td>${f3(v)}</td>`).join("")}<td>${f3(D.average.reduce((a, b) => a + b))}</td></tr>
+      <tr class="reveal"><td>× [1, 0.75, 1]</td>${D.scaled.map(v => `<td>${f3(v)}</td>`).join("")}<td>${f3(D.scaled.reduce((a, b) => a + b))}</td></tr>
+      <tr class="total reveal"><td>÷ sum</td>${D.final.map(v => `<td>${f3(v)}</td>`).join("")}<td>1.000</td></tr></tbody></table>` }),
+  "out": () => ({ title: "The prediction", text: `<p>The class with the highest probability wins, and its probability is the score. The confidence level says how often predictions with a similar score were right on 446 validation posts: about 95% at high (0.70 or more), 72% at medium, and about half at low (below 0.45).</p>`,
+    side: `<table class="calc"><tbody><tr><td>winning class</td><td>${D.label}</td></tr><tr><td>score</td><td>${f3(D.score)}</td></tr><tr><td>confidence</td><td>${D.confidence}</td></tr>${R.text ? `<tr><td>caption on its own</td><td>${R.text.label} ${f3(Math.max(...R.text.proba))}</td></tr>` : ""}${R.image ? `<tr><td>picture on its own</td><td>${R.image.label} ${f3(Math.max(...R.image.proba))}</td></tr>` : ""}</tbody></table>` }),
+};
+function labelTables(root = document) {
+  root.querySelectorAll("table").forEach(t => { const h = [...t.querySelectorAll("thead th")].map(x => x.textContent);
+    t.querySelectorAll("tbody tr").forEach(r => [...r.children].forEach((td, i) => { if (h[i]) td.dataset.label = h[i]; })); });
+}
+function open(k, scroll) {
+  sel = k;
+  document.querySelectorAll(".node").forEach(n => n.classList.toggle("sel", n.dataset.k === k));
+  if (!D) return;
+  const d = avail(k) ? DETAIL[k]() : { title: NAMES[k], text: `<p>This step has nothing to show for the current input. It needs ${NEEDS[k]}.</p>`, side: "" }, box = $("detail");
+  box.hidden = false; $("detailbtn").textContent = "Hide detail"; $("detailbtn").setAttribute("aria-pressed", "true");
+  box.innerHTML = `<header><b>${d.title}</b><button class="btn" type="button" id="replay">Replay</button></header><div class="body anim"><div>${d.text}</div><div>${d.side}</div></div>`;
+  const big = $("bigheat");
+  if (big) { const key = big.dataset.key; heat(big, B[key].z, B[key].top.map(t => t.dim));
+    big.addEventListener("mousemove", e => { const r = big.getBoundingClientRect(); const cx = Math.floor((e.clientX - r.left) / r.width * 32), cy = Math.floor((e.clientY - r.top) / r.height * 16); const i = cy * 32 + cx;
+      if (i >= 0 && i < 512) $("readout").textContent = `dimension ${i}: ${B[key].z[i] >= 0 ? "+" : "−"}${Math.abs(B[key].z[i]).toFixed(2)} standard deviations from the training average`; }); }
+  labelTables(box); play(); wires();
+  if (scroll) box.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest" });
+}
+function play() {
+  const body = document.querySelector(".detail .body"); if (!body) return;
+  $("replay").onclick = play;
+  body.classList.add("anim"); body.classList.remove("play");
+  if (reduce) { body.classList.remove("anim"); return; }
+  body.querySelectorAll(".reveal").forEach((r, i) => r.style.transitionDelay = (i * 70) + "ms");
+  body.querySelectorAll(".grow").forEach((g, i) => g.style.transitionDelay = (120 + i * 25) + "ms");
+  requestAnimationFrame(() => requestAnimationFrame(() => { body.classList.remove("anim"); body.classList.add("play"); }));
+}
+document.querySelectorAll("button.node").forEach(n => n.addEventListener("click", () => open(n.dataset.k, true)));
+$("detailbtn").addEventListener("click", () => { const box = $("detail"); box.hidden = !box.hidden;
+  $("detailbtn").textContent = box.hidden ? "Show detail" : "Hide detail"; $("detailbtn").setAttribute("aria-pressed", String(!box.hidden)); });
+
+// ---------- Animated figures: each loops through the steps of one calculation ----------
+function barsFig(id, steps) {
+  const box = $(id);
+  box.innerHTML = `<div class="fstep"></div>` + C.map(l => `<div class="frow"><span>${l}</span><span class="ftrack"><i></i></span><b></b></div>`).join("") + `<div class="fdots">${steps.map(() => "<i></i>").join("")}</div>`;
+  const rows = [...box.querySelectorAll(".frow")], dots = [...box.querySelectorAll(".fdots i")];
+  let k = reduce ? steps.length - 1 : 0;
+  const show = () => { const s = steps[k]; box.querySelector(".fstep").textContent = s.t; box.classList.toggle("div", !!s.div);
+    rows.forEach((r, i) => { const v = s.v[i], bar = r.querySelector("i");
+      if (s.div) { const w = Math.min(1, Math.abs(v) / s.max) * 50; bar.style.left = (v < 0 ? 50 - w : 50) + "%"; bar.style.width = w + "%"; bar.style.background = v < 0 ? "var(--neg)" : "var(--pos)"; }
+      else { bar.style.left = "0%"; bar.style.width = Math.min(1, v / s.max) * 100 + "%"; bar.style.background = "#7a7a7a"; }
+      r.querySelector("b").textContent = s.fmt(v); r.classList.toggle("hl", s.hl === i); });
+    dots.forEach((d, i) => d.classList.toggle("on", i === k)); };
+  show(); if (!reduce) timers.push(setInterval(() => { k = (k + 1) % steps.length; show(); }, 1700));
+}
+function figures() {
+  timers.forEach(clearInterval); timers = [];
+  const note = (id, text) => { $(id).classList.remove("div"); $(id).innerHTML = `<div class="fstep" style="font-weight:400;color:var(--mute);margin:0">${text}</div>`; };
+  const key = B.image ? "image" : "text", b = B[key], who = key === "image" ? "picture model" : "caption model";
+  // Figure 1: an embedding filling in
+  $("fig-enc-img").hidden = key !== "image" || $("pic").hidden; if (!$("fig-enc-img").hidden) $("fig-enc-img").src = $("pic").src;
+  $("fig-enc-arrow").textContent = key === "image" ? "CLIP image encoder" : "CLIP text encoder";
+  let n = reduce ? 512 : 0, hold = 0; const cv = $("fig-enc-cv"), paint = () => heat(cv, b.z.map((x, i) => i < n ? x : null));
+  paint(); if (!reduce) timers.push(setInterval(() => { if (n >= 512) { if (++hold > 30) { n = 0; hold = 0; } else return; } else n += 8; paint(); }, 60));
+  // Figures 2 and 3: one model's scores building up, then softmax
+  const cum = [[0, 0, 0]], names = ["start at zero"];
+  b.top.forEach(t => { cum.push(cum.at(-1).map((v, i) => v + t.push[i])); names.push(`+ dimension ${t.dim}`); });
+  cum.push(cum.at(-1).map((v, i) => v + b.rest[i])); names.push("+ 504 other dimensions");
+  cum.push(b.logits); names.push("+ constant = score z");
+  const m = Math.max(...cum.flat().map(Math.abs));
+  barsFig("fig-lr", cum.map((v, i) => ({ t: `${who}: ${names[i]}`, v, div: true, max: m, fmt: sg })));
+  const ex = b.logits.map(Math.exp), lm = Math.max(...b.logits.map(Math.abs));
+  barsFig("fig-soft", [{ t: `${who}: scores z`, v: b.logits, div: true, max: lm, fmt: sg }, { t: "exponentiate: exp(z)", v: ex, max: Math.max(...ex), fmt: f3 }, { t: "divide by the sum: probabilities", v: b.proba, max: 1, fmt: f3 }]);
+  // Figures 4 and 5: fusion and the neutral rescale need both inputs
+  if (!D.average) { note("fig-fuse", "Add both a picture and a caption to see the three models combined"); note("fig-scale", "Add both a picture and a caption to see the rescale"); return; }
+  barsFig("fig-fuse", [{ t: "picture model", v: B.image.proba, max: 1, fmt: f3 }, { t: "caption model", v: B.text.proba, max: 1, fmt: f3 }, { t: "word model", v: B.words.proba, max: 1, fmt: f3 }, { t: "mean of the three", v: D.average, max: 1, fmt: f3 }]);
+  barsFig("fig-scale", [{ t: "mean of the three", v: D.average, max: 1, fmt: f3 }, { t: "neutral × 0.75", v: D.scaled, max: 1, fmt: f3, hl: 1 }, { t: "divide by the sum", v: D.final, max: 1, fmt: f3 }]);
+}
+
+// ---------- Agreement ----------
+function drawHist() {
+  const A = D.agreement, s = $("hist"); s.innerHTML = "";
+  const W = Math.round(s.parentElement.clientWidth), Hh = Math.max(220, Math.min(280, W * 0.4)), L = 12, Rr = 12, T = 20, Bb = 52, max = Math.max(...A.hist);
+  s.setAttribute("viewBox", `0 0 ${W} ${Hh}`); s.setAttribute("width", W); s.setAttribute("height", Hh);
+  const x = v => L + (Math.min(Math.max(v, A.edges[0]), A.edges.at(-1)) - A.edges[0]) / (A.edges.at(-1) - A.edges[0]) * (W - L - Rr), y = c => Hh - Bb - c / max * (Hh - T - Bb);
+  A.hist.forEach((c, i) => el(s, "rect", { class: "bin", x: x(A.edges[i]) + 1, y: y(c), width: Math.max(0, x(A.edges[i + 1]) - x(A.edges[i]) - 2), height: Hh - Bb - y(c) }));
+  el(s, "line", { class: "axis", x1: L, x2: W - Rr, y1: Hh - Bb, y2: Hh - Bb });
+  for (let v = Math.ceil(A.edges[0] * 10) / 10; v <= A.edges.at(-1) + 1e-9; v += 0.1) el(s, "text", { x: x(v), y: Hh - Bb + 20, "text-anchor": "middle", class: "muted" }, v.toFixed(1));
+  const posts = A.posts.toLocaleString("en-US");
+  el(s, "text", { x: (W + L) / 2, y: Hh - 8, "text-anchor": "middle", class: "muted" }, W < 520 ? "caption–picture similarity" : `cosine similarity of caption and picture, ${posts} training posts`);
+  const rows = [];
+  if (A.cos != null) {
+    const mx = x(A.cos), right = mx > W * 0.7;
+    el(s, "line", { x1: mx, x2: mx, y1: T - 4, y2: Hh - Bb, stroke: "#222", "stroke-width": 2 });
+    el(s, "text", { x: mx + (right ? -8 : 8), y: T + 10, "font-weight": 600, "text-anchor": right ? "end" : "start" }, `this post ${f3(A.cos)}`);
+    $("histcap").textContent = `Figure 6. This post's similarity is higher than ${A.cos_pct.toFixed(1)}% of training posts (median about ${A.median.toFixed(2)}). `
+      + (A.cos_pct < 5 ? "The caption does not describe what the picture shows." : A.cos_pct > 75 ? "The caption fits its picture more closely than most training captions do." : "The caption fits its picture about as well as a typical training caption does.");
+    rows.push(["Cosine similarity, caption to picture", f3(A.cos), `median ${A.median.toFixed(2)}`]);
+  } else $("histcap").textContent = `Figure 6. Caption–picture similarity across ${posts} training posts (median about ${A.median.toFixed(2)}). Add both a picture and a caption to place this post on it.`;
+  if (A.js != null) rows.push(["Jensen–Shannon divergence between the two readings", f3(A.js) + " bits", "0 to 1"]);
+  if (A.H_text != null) rows.push(["Entropy of the caption-only reading", f3(A.H_text) + " bits", "0 to 1.585"]);
+  if (A.H_image != null) rows.push(["Entropy of the picture-only reading", f3(A.H_image) + " bits", "0 to 1.585"]);
+  rows.push(["Entropy of the result", f3(A.H_final) + " bits", "0 to 1.585"]);
+  $("measures").tBodies[0].innerHTML = rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("");
+  labelTables($("measures").parentElement);
+}
+
+// ---------- Embedding maps ----------
+function map(s, M, title) {
+  s.innerHTML = ""; const two = innerWidth >= 700, W = Math.round(s.parentElement.clientWidth / (two ? 2 : 1) - (two ? 12 : 0)), H = Math.round(W * 0.8), P = 20, T = 56;
+  s.setAttribute("viewBox", `0 0 ${W} ${H}`); s.setAttribute("width", W); s.setAttribute("height", H);
+  const me = M.me || [], xs = M.pts.map(p => p[0]).concat(me.slice(0, 1)), ys = M.pts.map(p => p[1]).concat(me.slice(1, 2));
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const X = v => P + (v - x0) / (x1 - x0) * (W - 2 * P), Y = v => H - P - (v - y0) / (y1 - y0) * (H - P - T - 12);
+  el(s, "text", { x: 0, y: 16, "font-weight": 600, "font-size": 14 }, title);
+  el(s, "rect", { x: .5, y: T - 8, width: W - 1, height: H - T + 7, fill: "#fafafa", class: "axis" });
+  M.pts.forEach(p => el(s, "circle", { cx: X(p[0]), cy: Y(p[1]), r: 2.5, class: "c-" + K[p[2]], "fill-opacity": 0.55 }));
+  if (M.me) { const cx = X(M.me[0]), cy = Y(M.me[1]);
+    el(s, "path", { d: `M${cx - 10},${cy} H${cx + 10} M${cx},${cy - 10} V${cy + 10}`, stroke: "#fff", "stroke-width": 6 });
+    el(s, "path", { d: `M${cx - 10},${cy} H${cx + 10} M${cx},${cy - 10} V${cy + 10}`, stroke: "#111", "stroke-width": 2.5 }); }
+  el(s, "text", { x: 0, y: 36, class: "muted" }, `PC1 ${(M.var[0] * 100).toFixed(1)}%, PC2 ${(M.var[1] * 100).toFixed(1)}% of variance`);
+}
+function drawMaps() { map($("mapT"), D.maps.text, "Caption space"); map($("mapI"), D.maps.image, "Picture space");
+  $("mapcap").innerHTML = `Figure 7. ${D.maps.text.pts.length} random training posts per space: <i class="sw c-neg"></i>negative<i class="sw c-neu"></i>neutral<i class="sw c-pos"></i>positive. Two components keep only a small share of the variance, so the classes overlap here far more than they do for the classifiers.`; }
+
+// ---------- Word contributions ----------
+function drawWords() {
+  const s = $("wordbars"); s.innerHTML = "";
+  const t = D.terms.slice(0, 8), W = Math.round(s.parentElement.clientWidth), row = 28, L = Math.min(180, Math.round(W * 0.24)), mid = L + Math.round((W - L) * 0.45);
+  $("wordcap").textContent = t.length ? "Figure 8. " + wordNote : "Figure 8. Add a caption with words the model knows to see their contributions.";
+  s.setAttribute("viewBox", `0 0 ${W} ${t.length * row + 40}`); s.setAttribute("width", W); s.setAttribute("height", t.length ? t.length * row + 40 : 0);
+  if (!t.length) return;
+  const net2 = t.map(x => x.push[2] - x.push[0]), mp = Math.max(...net2, 0.01), mn = Math.max(...net2.map(v => -v), 0.01), sc = Math.min((W - mid - 64) / mp, (mid - L - 64) / mn);
+  el(s, "line", { class: "axis", x1: mid, x2: mid, y1: 0, y2: t.length * row + 4 });
+  t.forEach((x, i) => { const y = 4 + i * row, v = net2[i];
+    el(s, "text", { x: L, y: y + 16, "text-anchor": "end" }, x.term);
+    el(s, "rect", { x: v >= 0 ? mid : mid + v * sc, y: y + 4, width: Math.abs(v) * sc, height: 16, class: v >= 0 ? "c-pos" : "c-neg" });
+    el(s, "text", { x: v >= 0 ? mid + v * sc + 8 : mid + v * sc - 8, y: y + 16, "text-anchor": v >= 0 ? "start" : "end" }, sg(v)); });
+  el(s, "text", { x: mid - 8, y: t.length * row + 28, "text-anchor": "end", class: "muted" }, W < 520 ? "negative" : "towards negative");
+  el(s, "text", { x: mid + 8, y: t.length * row + 28, class: "muted" }, W < 520 ? "positive" : "towards positive");
+}
+
+// ---------- Confusion matrix (the saved test result, the same for every post) ----------
+function drawCM() {
+  const s = $("cm"); s.innerHTML = "";
+  const W = Math.min(480, Math.round(s.parentElement.clientWidth)), M = [[99, 7, 28], [13, 13, 13], [39, 7, 228]], L = 104, T = 56, c = Math.min(116, Math.floor((W - L) / 3));
+  s.setAttribute("viewBox", `0 0 ${W} ${T + 3 * c + 8}`); s.setAttribute("width", W); s.setAttribute("height", T + 3 * c + 8);
+  el(s, "text", { x: L + 1.5 * c, y: 16, "text-anchor": "middle", class: "muted" }, "predicted class");
+  el(s, "text", { x: 12, y: T + 1.5 * c, "text-anchor": "middle", class: "muted", transform: `rotate(-90 12 ${T + 1.5 * c})` }, "true class");
+  M.forEach((r, i) => { const tot = r.reduce((a, b) => a + b);
+    el(s, "text", { x: L - 12, y: T + i * c + c / 2 + 4, "text-anchor": "end" }, C[i]);
+    el(s, "text", { x: L + i * c + c / 2, y: T - 12, "text-anchor": "middle" }, C[i]);
+    r.forEach((v, j) => { const sh = v / tot, dark = sh > 0.5;
+      el(s, "rect", { x: L + j * c, y: T + i * c, width: c - 2, height: c - 2, class: "c-pos", "fill-opacity": 0.05 + 0.9 * sh });
+      el(s, "text", { x: L + j * c + c / 2 - 1, y: T + i * c + c / 2 + 2, "text-anchor": "middle", "font-weight": 600, "font-size": 20, style: dark ? "fill:#fff" : "" }, v);
+      el(s, "text", { x: L + j * c + c / 2 - 1, y: T + i * c + c / 2 + 22, "text-anchor": "middle", style: dark ? "fill:#fff" : "", class: dark ? "" : "muted" }, (sh * 100).toFixed(0) + "%"); }); });
+}
+function drawPlots() { drawCM(); if (D) { drawHist(); drawMaps(); drawWords(); } }
+
+// ---------- Predict: ask the server, then draw the chain left to right ----------
+const COLS = [[], ["enc-image", "enc-text", "enc-words"], ["lr-image", "lr-text", "lr-words"], ["mean"], ["scale"], ["out"]];
+function draw() {
+  if (reduce) return;
+  COLS.flat().forEach(k => { const n = nodeOf(k); n.classList.add("step"); n.style.setProperty("--d", (COLS.findIndex(c => c.includes(k)) * 220) + "ms"); });
+  $("result").classList.add("step"); $("result").style.setProperty("--d", "1300ms");
+  const key = net.querySelector(".cellkey"); key.classList.add("step"); key.style.setProperty("--d", "440ms");
+  net.classList.remove("drawn"); net.classList.add("drawing");
+  void net.offsetWidth;   // commit the hidden starting state before animating
+  net.classList.remove("drawing"); net.classList.add("drawn");
+}
+function status(text, error) { $("status").textContent = text || ""; $("status").classList.toggle("err", !!error); }
+async function ask(path, body) {
+  let response;
+  try { response = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined); }
+  catch (e) { throw new Error("The demo server isn't answering. Start it with: python app/server.py"); }
+  const answer = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(answer.error || "Something went wrong. Please try again.");
+  return answer;
+}
+async function predict() {
+  const text = $("caption").value.trim();
+  if (!text && !picture) return status("Add a picture, a caption, or both.", true);
+  const body = { text };
+  if (picture && picture.kind === "upload") body.image = picture.data;
+  if (picture && picture.kind === "example") body.example_image = true;
+  $("predict").disabled = true; $("predict").textContent = "Predicting…"; status("");
+  try { render(await ask("/predict", body)); draw(); }
+  catch (e) { status(e.message, true); }
+  finally { $("predict").disabled = false; $("predict").textContent = "Predict sentiment"; }
+}
+$("predict").addEventListener("click", predict);
+$("caption").addEventListener("keydown", e => { if (e.key === "Enter") predict(); });
+$("caption").addEventListener("input", () => { $("capshow").textContent = $("caption").value || "no caption"; if (D) markStale(true); wires(); });
+
+// ---------- Choosing a picture ----------
+function showPicture() {
+  const on = !!picture;
+  $("pic").hidden = !on; $("empty").hidden = on; $("empty").textContent = "no picture"; $("thumb").style.visibility = on ? "visible" : "hidden"; $("remove").hidden = !on;
+  if (on) { const src = picture.kind === "upload" ? picture.data : picture.url; $("pic").src = src; $("thumb").src = src;
+    $("pic").alt = picture.kind === "upload" ? "The chosen picture" : "The example picture, from the dataset's test posts"; }
+  wires();
+}
+$("pic").addEventListener("error", () => { $("pic").hidden = true; $("empty").hidden = false; $("thumb").style.visibility = "hidden";
+  $("empty").textContent = picture && picture.kind === "example" ? "the example picture needs an internet connection" : "this picture can't be shown"; wires(); });
+$("pic").addEventListener("load", wires);
+function usePicture(file) {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) return status("That file isn't a picture. Please use a JPG or PNG.", true);
+  if (file.size > MAX_IMAGE_BYTES) return status("That picture is too large. Please use one under 20 MB.", true);
+  const reader = new FileReader();
+  reader.onload = () => { picture = { kind: "upload", data: reader.result }; status(""); showPicture(); if (D) markStale(true); };
+  reader.readAsDataURL(file);
+}
+$("choose").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", () => { usePicture($("file").files[0]); $("file").value = ""; });
+$("remove").addEventListener("click", () => { picture = null; showPicture(); if (D) markStale(true); });
+addEventListener("dragover", e => e.preventDefault());
+addEventListener("drop", e => { e.preventDefault(); usePicture(e.dataTransfer.files[0]); });
+
+// ---------- Start: show the example post ----------
+let pt; addEventListener("resize", () => { fit(); wires(); clearTimeout(pt); pt = setTimeout(drawPlots, 120); });
+new ResizeObserver(wires).observe(net);
+fit(); showPicture(); drawPlots(); labelTables();
+ask("/example").then(example => { picture = { kind: "example", url: example.image_url }; $("caption").value = example.caption; showPicture(); render(example); })
+  .catch(e => status(e.message, true));
 </script>
 </body>
 </html>
