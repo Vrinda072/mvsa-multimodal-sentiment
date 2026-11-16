@@ -7,7 +7,7 @@
 <style>
 :root {
   color-scheme: light;
-  --text: #4a4a4a; --head: #444444; --para: #555555; --mute: #808080; --line: #dbdbdb; --edge: #d4d4d4; --band: #fafafa; --dark: #1e1e1e; --btn: #363636;
+  --text: #4a4a4a; --head: #444444; --para: #555555; --mute: #6b6b6b; --line: #dbdbdb; --edge: #d4d4d4; --band: #fafafa; --dark: #1e1e1e; --btn: #363636;
   --neg: #b2182b; --pos: #2166ac; --neu: #999999;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --font: system-ui, -apple-system, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -21,7 +21,7 @@ button, input { font: inherit; color: inherit; }
 
 /* Header and control row */
 #header { height: 52px; background: var(--dark); display: flex; align-items: baseline; gap: 16px; padding: 0 20px; line-height: 52px; white-space: nowrap; overflow: hidden; }
-#header b { color: #fafafa; font-size: 22px; font-weight: 500; }
+#header h1 { margin: 0; color: #fafafa; font-size: 22px; font-weight: 500; line-height: inherit; }
 #header span { color: #d0d0d0; font-size: 16px; overflow: hidden; text-overflow: ellipsis; }
 .control { display: flex; align-items: center; gap: 12px; padding: 8px 20px; min-height: 56px; flex-wrap: wrap; }
 .thumb { width: 40px; height: 40px; border: 2px solid var(--line); border-radius: 4px; object-fit: cover; display: block; background: var(--band); }
@@ -128,8 +128,8 @@ svg.wires path.hot { stroke: #6b6b6b; stroke-width: 1.5; }
 /* Article */
 #description { max-width: 826px; margin: 0 auto 80px; padding: 0 20px; }
 #description h2 { font-size: 40px; font-weight: 450; line-height: 1.5; color: var(--head); margin: 60px 0 12px; }
-#description h4 { font-size: 32px; font-weight: 450; line-height: 1.5; color: var(--head); margin: 44px 0 8px; }
-#description h6 { font-size: 24px; font-weight: 450; line-height: 1.5; color: var(--head); margin: 44px 0 8px; }
+#description h3 { font-size: 32px; font-weight: 450; line-height: 1.5; color: var(--head); margin: 44px 0 8px; }
+#description h4, #description h3.minor { font-size: 24px; font-weight: 450; line-height: 1.5; color: var(--head); margin: 44px 0 8px; }
 #description p, #description li { font-size: 17px; line-height: 1.6; color: var(--para); }
 #description p { margin: 16px 0; }
 #description ol, #description ul { margin: 0; padding-left: 40px; }
@@ -180,7 +180,7 @@ table.std b { font-weight: 600; color: #222; }
 }
 @media (max-width: 700px) {
   #header span { display: none; }
-  #description h2 { font-size: 30px; } #description h4 { font-size: 25px; } #description h6 { font-size: 21px; }
+  #description h2 { font-size: 30px; } #description h3 { font-size: 25px; } #description h4 { font-size: 21px; }
   .verdict { font-size: 32px; }
   table.std thead, table.calc thead { display: none; }
   table.std tr, table.calc tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 12px; padding: 8px 0; border-top: 1px solid #ededed; }
@@ -195,7 +195,7 @@ table.std b { font-weight: 600; color: #222; }
 </head>
 <body>
 
-<div id="header"><b>Sentiment Explainer</b></div>
+<div id="header"><h1>Sentiment Explainer</h1></div>
 
 <div class="control">
   <img class="thumb" id="thumb" alt="">
@@ -271,28 +271,28 @@ table.std b { font-weight: 600; color: #222; }
   <h2>What does each step of the model do?</h2>
   <p>Click a step in the diagram above while you read. Each one opens a worked example with this post's own numbers.</p>
 
-  <h4>Input</h4>
+  <h3>Input</h3>
   <p>The picture and the caption stay separate from start to finish. The picture is resized and centre-cropped to 224 × 224 pixels with three colour channels, the size CLIP was trained on. The caption is cleaned the way the training tweets were: links are removed, @mentions are replaced, hashtags are split into words and emoji are written as words. Words written inside a picture are not read out; only the picture encoder sees them.</p>
 
-  <h4>CLIP encoders</h4>
+  <h3>CLIP encoders</h3>
   <p>CLIP's vision transformer turns the picture into 512 numbers, and its text transformer does the same for the caption. In the diagram each embedding is drawn as a 32 × 16 grid. A cell is red when that value is below the training average and blue when it is above. Because CLIP learned to place a picture near its caption, the two embeddings live in comparable spaces, which the agreement section below uses.</p>
   <div class="figure"><div class="anim-fig" id="fig-enc"><img id="fig-enc-img" alt=""><span class="arrow" id="fig-enc-arrow">CLIP image encoder</span><canvas id="fig-enc-cv" width="320" height="160"></canvas></div><div class="figure-caption">Figure 1. A CLIP encoder turns its input into 512 values, filled in here in reading order. Red is below the training average, blue above.</div></div>
 
-  <h4>Word features</h4>
+  <h3>Word features</h3>
   <p>The caption is also counted word by word. TF-IDF scores each word and word pair by how often it appears in this caption and how rare it is across all training captions, using a 5,000-term vocabulary. This gives the model a direct view of sentiment words such as "happy", which a general-purpose embedding can blur.</p>
 
-  <h4>Logistic regression</h4>
+  <h3>Logistic regression</h3>
   <p>Three classifiers work side by side, one per encoder output. Each multiplies every input value by a learned weight, adds the products, and gets one score per class. Strong regularisation (C = 0.001) keeps every weight on the CLIP embeddings small, so no single dimension decides.</p>
   <div class="figure"><div class="anim-fig" id="fig-lr"></div><div class="figure-caption">Figure 2. One model's three class scores build up as each value × weight is added: the eight strongest dimensions first, then the other 504 together, then the constant.</div></div>
-  <h6>Softmax</h6>
+  <h4>Softmax</h4>
   <div class="formula">p<sub>k</sub> = exp(z<sub>k</sub>) / (exp(z<sub>neg</sub>) + exp(z<sub>neu</sub>) + exp(z<sub>pos</sub>))</div>
   <p>Softmax turns the three scores z into probabilities that sum to 1. A class with a much higher score than the others takes nearly all the probability; three similar scores give three similar probabilities.</p>
   <div class="figure"><div class="anim-fig" id="fig-soft"></div><div class="figure-caption">Figure 3. Softmax on that model's scores: each score is exponentiated, then divided by the sum of the three.</div></div>
 
-  <h4>Late fusion</h4>
+  <h3>Late fusion</h3>
   <p>The three classifiers vote with their probabilities, and each vote counts equally. The mean of the three is the fused reading. Late fusion keeps the picture and the caption as separate judgements, so a strong picture cannot hide a contradicting caption inside one shared vector.</p>
   <div class="figure"><div class="anim-fig" id="fig-fuse"></div><div class="figure-caption">Figure 4. Late fusion: the three models' probabilities, one model at a time, and then their mean.</div></div>
-  <h6>Rescaling neutral</h6>
+  <h4>Rescaling neutral</h4>
   <p>Before the final answer, the neutral probability is multiplied by 0.75 and the three are rescaled to sum to 1. The factor was chosen by cross-validation on the training and validation posts. It trades some neutral recall for fewer false neutrals, which raised both accuracy and macro-F1.</p>
   <div class="figure"><div class="anim-fig" id="fig-scale"></div><div class="figure-caption">Figure 5. Rescaling: the neutral probability is multiplied by 0.75, then all three are divided by their new sum.</div></div>
 
@@ -317,7 +317,7 @@ table.std b { font-weight: 600; color: #222; }
   <div class="figure tbl"><table class="std"><thead><tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th><th>Posts</th></tr></thead>
     <tbody><tr><td>Negative</td><td>0.656</td><td>0.739</td><td>0.695</td><td>134</td></tr><tr><td>Neutral</td><td>0.481</td><td>0.333</td><td>0.394</td><td>39</td></tr>
     <tr><td>Positive</td><td>0.848</td><td>0.832</td><td>0.840</td><td>274</td></tr><tr><td><b>Macro average</b></td><td>0.662</td><td>0.635</td><td><b>0.643</b></td><td>447</td></tr></tbody></table></div>
-  <h6>Confidence</h6>
+  <h3 class="minor">Confidence</h3>
   <p>The score of the winning class is sorted into three levels. The table shows how often predictions at each level were right on 446 validation posts. Always answering "positive" would be right 61.3% of the time, with macro-F1 0.253.</p>
   <div class="figure tbl"><table class="std"><thead><tr><th>Confidence</th><th>Share of posts</th><th>Right</th></tr></thead>
     <tbody><tr><td>High, 0.70 or more</td><td>14.6%</td><td>95.4%</td></tr><tr><td>Medium, 0.45 to 0.70</td><td>63.7%</td><td>71.8%</td></tr><tr><td>Low, below 0.45</td><td>21.7%</td><td>51.5%</td></tr></tbody></table></div>
@@ -664,7 +664,10 @@ function drawCM() {
       el(s, "text", { x: L + j * c + c / 2 - 1, y: T + i * c + c / 2 + 2, "text-anchor": "middle", "font-weight": 600, "font-size": 20, style: dark ? "fill:#fff" : "" }, v);
       el(s, "text", { x: L + j * c + c / 2 - 1, y: T + i * c + c / 2 + 22, "text-anchor": "middle", style: dark ? "fill:#fff" : "", class: dark ? "" : "muted" }, (sh * 100).toFixed(0) + "%"); }); });
 }
-function drawPlots() { drawCM(); if (D) { drawHist(); drawMaps(); drawWords(); } }
+function drawPlots() {
+  if ($("description").clientWidth < 100) return;   // the page isn't laid out yet (a hidden tab); the observer below redraws
+  drawCM(); if (D) { drawHist(); drawMaps(); drawWords(); }
+}
 
 // ---------- Predict: ask the server, then draw the chain left to right ----------
 const COLS = [[], ["enc-image", "enc-text", "enc-words"], ["lr-image", "lr-text", "lr-words"], ["mean"], ["scale"], ["out"]];
@@ -729,6 +732,7 @@ addEventListener("drop", e => { e.preventDefault(); usePicture(e.dataTransfer.fi
 // ---------- Start: show the example post ----------
 let pt; addEventListener("resize", () => { fit(); wires(); clearTimeout(pt); pt = setTimeout(drawPlots, 120); });
 new ResizeObserver(wires).observe(net);
+new ResizeObserver(() => { clearTimeout(pt); pt = setTimeout(drawPlots, 120); }).observe($("description"));
 fit(); showPicture(); drawPlots(); labelTables();
 ask("/example").then(example => { picture = { kind: "example", url: example.image_url }; $("caption").value = example.caption; showPicture(); render(example); })
   .catch(e => status(e.message, true));
