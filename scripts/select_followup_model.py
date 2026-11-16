@@ -27,6 +27,8 @@ from sklearn.preprocessing import StandardScaler
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LABELS = ["negative", "neutral", "positive"]
+# The grid: regularisation strength (smaller C is stronger), the multiplier on the neutral probability,
+# and the caption's weight in two-model late fusion
 CS = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
 NEUTRAL = [0.75, 1.0, 1.25, 1.5]
 WEIGHTS = [0.3, 0.5, 0.7]
@@ -34,6 +36,7 @@ NEUTRAL_INDEX = LABELS.index("neutral")
 
 
 def clip_model(C):
+    """Standardise the features, then fit a logistic regression with balanced class weights."""
     return make_pipeline(StandardScaler(), LogisticRegression(C=C, class_weight="balanced", max_iter=5000))
 
 
@@ -47,18 +50,23 @@ def main():
                         keep_default_na=False).set_index("id")
 
     def load(s):
+        # One split: post ids, CLIP text and image embeddings, engineered features and TF-IDF counts
         return (np.loadtxt(os.path.join(F, f"{s}_ids.txt"), dtype=str, ndmin=1),
                 np.load(os.path.join(F, f"{s}_clip_text.npy")), np.load(os.path.join(F, f"{s}_clip_image.npy")),
                 np.load(os.path.join(F, f"{s}_meta.npy")), sparse.load_npz(os.path.join(F, f"{s}_tfidf.npz")))
 
+    # Selection uses the training and validation splits together. The test split is never read here.
     a, b = load("train"), load("val")
     ids = np.r_[a[0], b[0]]
     T, I, M = np.vstack([a[1], b[1]]), np.vstack([a[2], b[2]]), np.vstack([a[3], b[3]])
     W = sparse.vstack([a[4], b[4]]).tocsr()
     y = posts.loc[ids, "label"].map({l: i for i, l in enumerate(LABELS)}).to_numpy(int)
+    # Posts with the same caption stay in the same fold, so a repeated tweet cannot be in both train and test
     groups = posts.loc[ids, "text_clean"].str.lower().to_numpy()
     X = {"text": T, "image": I, "early": np.hstack([T, I]), "early_meta": np.hstack([T, I, M])}
 
+    # 5 folds, repeated with 3 different shuffles. Each model is fitted once per fold and its held-out
+    # probabilities are kept, so every configuration below is scored without refitting.
     folds = [f for r in range(3) for f in StratifiedGroupKFold(5, shuffle=True, random_state=r).split(T, y, groups)]
     P = []
     for n, (tr, te) in enumerate(folds):
@@ -68,6 +76,7 @@ def main():
         print(f"fold {n + 1} of {len(folds)}", flush=True)
 
     def score(fn, n):
+        # fn combines the saved probabilities into one prediction; n is the multiplier on neutral
         rows = []
         for (_, te), p in zip(folds, P):
             q = fn(p).copy()
@@ -79,6 +88,8 @@ def main():
         return {"macro_f1": s[:, 0].mean(), "macro_f1_std": s[:, 0].std(), "accuracy": s[:, 1].mean(),
                 "neutral_f1": s[:, 2].mean()}
 
+    # Every combination: early fusion with and without engineered features, two-model late fusion at each
+    # caption weight, and three-model late fusion with the TF-IDF word model
     results = []
     for C, n in itertools.product(CS, NEUTRAL):
         for k in ("early", "early_meta"):
@@ -94,6 +105,7 @@ def main():
     for cfg, s in results[:8]:
         print(f"  macro-F1 {s['macro_f1']:.3f} +- {s['macro_f1_std']:.3f}  accuracy {s['accuracy']:.3f}  "
               f"neutral F1 {s['neutral_f1']:.3f}  {cfg}")
+    # The main reported model, scored the same way, for comparison
     main_model = next(s for c, s in results if c == {"setup": "late", "C": 0.01, "w": 0.5, "neutral": 1.0})
     print(f"main model (late fusion, C=0.01): macro-F1 {main_model['macro_f1']:.3f}  accuracy {main_model['accuracy']:.3f}")
 
