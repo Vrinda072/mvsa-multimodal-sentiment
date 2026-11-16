@@ -53,6 +53,8 @@ The follow-up model is saved in `results/model/`, so you can classify a post tha
 python app/server.py
 ```
 
+![The demo page: the model drawn from left to right for an example post, with its prediction](docs/images/demo.png)
+
 It opens in your browser on an example post from the test split. Choose a picture, type its caption and click **Predict sentiment**. The page draws the model from left to right with this post's own numbers: the CLIP embeddings, the three classifiers' probabilities, their mean, the neutral rescale and the result. Click any step to see its calculation, and hover a class to trace it through the model. Below the diagram it shows how well the caption and the picture agree, where the post sits among the training posts, which words moved the word model, and the saved test results. A warning appears when the caption and the picture point in opposite directions, which can mean sarcasm or a mixed message. With only a caption or only a picture, it judges that part by itself.
 
 Everything runs on your computer, and pictures aren't saved. The dataset's pictures are not included in this repository, so the example post's picture is loaded from a public copy of the dataset and needs an internet connection; its numbers do not. Press Ctrl+C in the terminal to stop the page.
