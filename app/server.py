@@ -83,7 +83,10 @@ def make_handler(model, stats):
         def do_GET(self):
             if self.path == "/example":
                 from mvsa.explain import explain_example
-                return self.send_json(200, explain_example(model, stats))
+                try:
+                    return self.send_json(200, explain_example(model, stats))
+                except Exception as e:   # reply with the reason rather than dropping the connection
+                    return self.send_json(500, {"error": f"The example post couldn't be loaded ({e})."})
             if self.path not in ("/", "/index.html"):
                 return self.send_json(404, {"error": "Not found."})
             with open(os.path.join(APP_DIR, "index.html"), "rb") as f:
@@ -98,8 +101,10 @@ def make_handler(model, stats):
                 return self.send_json(413, {"error": "That image is too large. Please use one under 20 MB."})
             try:
                 self.send_json(200, run_explanation(model, stats, json.loads(self.rfile.read(length))))
-            except ValueError as e:
+            except ValueError as e:      # bad input from the page
                 self.send_json(400, {"error": str(e)})
+            except Exception as e:       # anything else is our fault, but the page should still get an answer
+                self.send_json(500, {"error": f"Something went wrong while predicting ({e})."})
 
         def log_message(self, *args):
             pass   # keep the terminal tidy

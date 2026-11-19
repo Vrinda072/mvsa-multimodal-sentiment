@@ -32,7 +32,7 @@ def find_preprocessed(roots=("/kaggle/working", "/kaggle/input")):
         for dirpath, dirs, files in os.walk(r):
             if "posts_preprocessed.csv" in files and "features" in dirs:
                 return dirpath
-    raise FileNotFoundError("preprocessed/ not found. Run mvsa_preprocessing.ipynb first, or attach its output.")
+    raise FileNotFoundError("preprocessed/ not found. Run the notebooks in notebooks/01_preprocessing first, or set MVSA_PRE.")
 
 PRE = find_preprocessed()
 F = os.path.join(PRE, "features")

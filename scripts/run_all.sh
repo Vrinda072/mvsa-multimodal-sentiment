@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs all six notebooks in order. The committed notebooks are not changed: executed copies and
+# Runs all the notebooks in order. The committed notebooks are not changed: executed copies and
 # all generated files go to a separate folder (runs/ locally, /kaggle/working on Kaggle).
 #
 # Usage: MVSA_ROOT=/path/to/MVSA_Single bash scripts/run_all.sh
