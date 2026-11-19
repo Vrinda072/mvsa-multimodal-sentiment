@@ -121,9 +121,24 @@ After the main results above were fixed, a follow-up checked whether a few cheap
 - **How sure the gain is:** the follow-up was right on 43 posts where the main model was wrong, and wrong on 14 where it was right (McNemar p = 0.0002). Over 5,000 bootstrap resamples of the test posts, the accuracy gain lies between +0.031 and +0.096, and the macro-F1 gain between -0.012 and +0.087, so the macro-F1 gain is less certain. The follow-up's own 95% intervals are 0.580 to 0.700 for macro-F1 and 0.720 to 0.799 for accuracy.
 - **Trade-off on neutral:** neutral F1 rose, but the follow-up predicts neutral far less often: 27 test posts instead of 69. Neutral precision rose from 0.275 to 0.481, and recall fell from 0.487 to 0.333.
 - **Hard-mismatch posts:** the follow-up matches the text label on 52.1% and the image label on 46.5%, so it leans more on the text than the main model does (41.1% and 51.0%).
-- **Comparison:** about 0.76 accuracy is in line with the 73% to 77% usually reported on MVSA-Single, although those papers use other labelling rules and splits, so the numbers aren't directly comparable.
+- **Comparison:** about 0.76 accuracy is in line with the 73% to 77% usually reported on MVSA-Single, although those papers use other labelling rules and splits, so the numbers aren't directly comparable. See [Comparison with published results](#comparison-with-published-results).
 
 The demo and `scripts/predict.py` use the follow-up model. Its selection is saved in `results/metrics/followup_selection.json` and its test scores in `results/metrics/followup_results.json`. Both can be recomputed with `scripts/select_followup_model.py` and `scripts/train_final_model.py`.
+
+## Comparison with published results
+
+The table lists results on MVSA-Single from papers in our literature review, next to ours.
+
+| Method | Approach | Accuracy | F1 | Macro-F1 |
+|---|---|---:|---:|---:|
+| MGNNS (Yang et al., ACL 2021) | Graph neural networks over text and image | 73.77 | 72.70 (weighted) | not reported |
+| CLMLF (Li et al., NAACL Findings 2022) | Contrastive learning, multi-layer Transformer fusion | 75.33 | 73.46 (weighted) | not reported |
+| DRF (Wu et al., ACM MM 2024) | Distribution-based feature recovery and fusion | 76.5 | 75.9 | not reported |
+| MMJL (Applied AI 2024) | Multimodal joint learning | 76.98 | 76.23 | not reported |
+| Ours, main model | Frozen CLIP, logistic regression, late fusion | 69.6 | 71.1 (weighted) | 60.3 |
+| Ours, follow-up model | Frozen CLIP and TF-IDF, logistic regression | 76.1 | 75.7 (weighted) | 64.3 |
+
+Our weighted F1 is computed from the per-class test scores, so it can be set beside the published figures. These numbers are still not directly comparable. Most papers drop the hard-mismatch posts in the same way, but each uses its own random split. Weighted F1 favours the large positive class, which is why we select and report by macro-F1, where the small neutral class counts as much as the others. The published models also train deep networks end to end, while ours only fits linear models on frozen features. On accuracy, the follow-up model sits within the published range of about 73% to 77%.
 
 ## Limitations
 
