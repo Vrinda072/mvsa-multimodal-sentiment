@@ -28,6 +28,7 @@ from sklearn.preprocessing import StandardScaler
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
+from mvsa.evaluation import bootstrap_scores, interval  # noqa: E402
 from mvsa.predict import tfidf_vector  # noqa: E402
 
 LABELS = ["negative", "neutral", "positive"]
@@ -142,13 +143,8 @@ def main():
             print(f"      McNemar: follow-up only right {b}, main model only right {c}, "
                   f"p = {report['mcnemar_test']['p_value']:.4f}")
             # 95% bootstrap intervals over test posts, for the follow-up and for its gain over the main model
-            rng, rows = np.random.default_rng(0), []
-            for _ in range(5000):
-                i = rng.integers(0, len(f), len(f))
-                yf, ym = f1_score(d["y"][i], f[i], average="macro"), f1_score(d["y"][i], m[i], average="macro")
-                af, am = accuracy_score(d["y"][i], f[i]), accuracy_score(d["y"][i], m[i])
-                rows.append((yf, af, yf - ym, af - am))
-            lo, hi = np.percentile(np.array(rows), [2.5, 97.5], axis=0)
+            boot = bootstrap_scores(d["y"], {"followup": f, "main": m}, n_boot=5000, seed=0)
+            lo, hi = interval(np.hstack([boot["followup"], boot["followup"] - boot["main"]]))
             report["bootstrap_95_test"] = {k: [round(lo[j], 3), round(hi[j], 3)] for j, k in enumerate(
                 ("followup_macro_f1", "followup_accuracy", "gain_macro_f1", "gain_accuracy"))}
             print("      95% intervals:", report["bootstrap_95_test"])
