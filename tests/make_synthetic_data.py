@@ -25,11 +25,12 @@ def main(folder):
     with open(os.path.join(folder, "labelResultAll.txt"), "w", encoding="utf-8") as labels:
         labels.write("ID\ttext,image\n")
         for post in range(1, N_POSTS + 1):
-            text_label = rng.choices(LABELS, weights=[6, 2, 3])[0]
-            image_label = text_label if rng.random() < 0.6 else rng.choice(LABELS)
+            text_label = rng.choices(LABELS, weights=[6, 2, 3])[0]        # roughly the real class imbalance
+            image_label = text_label if rng.random() < 0.6 else rng.choice(LABELS)   # some mismatches, as in MVSA
             labels.write(f"{post}\t{text_label},{image_label}\n")
             words = " ".join(rng.choices(WORDS[text_label].split(), k=4))
             with open(os.path.join(data, f"{post}.txt"), "w", encoding="utf-8") as f:
+                # The retweet prefix, mention, hashtag and link give the text cleaning something to do
                 f.write(f"RT @someone: {words} number {post} #synthetic{post} https://t.co/abc !!")
             noise = np_rng.integers(-40, 40, (64, 64, 3))
             pixels = np.clip(np.array(COLOURS[image_label]) + noise, 0, 255).astype("uint8")

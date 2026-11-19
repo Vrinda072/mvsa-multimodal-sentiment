@@ -53,11 +53,13 @@ def clean_caption(text):
 
 def softmax(logits):
     """Turn raw scores into probabilities that sum to 1."""
-    exp = np.exp(logits - logits.max(axis=-1, keepdims=True))
+    exp = np.exp(logits - logits.max(axis=-1, keepdims=True))   # subtracting the max avoids overflow
     return exp / exp.sum(axis=-1, keepdims=True)
 
 
 class SentimentModel:
+    """The saved follow-up model: plain numpy weights, so predicting needs no scikit-learn objects."""
+
     def __init__(self, path=DEFAULT_MODEL):
         with np.load(path, allow_pickle=False) as f:
             self.parts = {k: f[k] for k in f.files}
@@ -74,7 +76,7 @@ class SentimentModel:
         expected = p[f"{key}_mean"].shape[0]
         if embeddings.shape[1] != expected:
             raise ValueError(f"Expected {expected}-dimensional {modality} embeddings, got {embeddings.shape[1]}.")
-        scaled = (embeddings - p[f"{key}_mean"]) / p[f"{key}_scale"]
+        scaled = (embeddings - p[f"{key}_mean"]) / p[f"{key}_scale"]   # the StandardScaler step of the pipeline
         return softmax(scaled @ p[f"{key}_coef"].T + p[f"{key}_intercept"])
 
     @property
@@ -110,7 +112,7 @@ class SentimentModel:
         if words is None:
             raise ValueError("Give the caption's TF-IDF vector (words_vector) along with the text embedding.")
         proba = (self._proba("text", text) + self._proba("image", image) + self._words_proba(words)) / 3
-        proba[:, self.labels.index("neutral")] *= self.neutral_multiplier
+        proba[:, self.labels.index("neutral")] *= self.neutral_multiplier   # 0.75, chosen by cross-validation
         return proba / proba.sum(axis=1, keepdims=True)
 
     def _load_clip(self):
@@ -164,7 +166,7 @@ class SentimentModel:
             for name, emb in (("text", text), ("image", image)):
                 if emb is not None:
                     readings[name] = self._summary(self.reading(name, emb)[0])
-        if text is not None and image is not None or not readings:
+        if (text is not None and image is not None) or not readings:
             overall = self._summary(self.proba_from_embeddings(text, image, words)[0])
         else:
             overall = next(iter(readings.values()))

@@ -6,7 +6,7 @@ import json
 import os
 
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use("Agg")   # draw to files only, so it also works without a display
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -16,6 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 METRICS = os.path.join(ROOT, "results", "metrics")
 FIGURES = os.path.join(ROOT, "results", "figures")
 
+# One palette for every figure, so they look like a set in the report
 SURFACE, INK, MUTED, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"
 SEQUENTIAL = LinearSegmentedColormap.from_list("blue", ["#eef4fb", "#8db8ea", BLUE, "#154a8a"])
@@ -71,6 +72,7 @@ def heatmap(ax, table, cmap, vmin, vmax, fmt, highlight=None):
         if np.isnan(v):
             continue
         red, green, blue, _ = cmap((v - vmin) / (vmax - vmin))
+        # Relative luminance of the cell colour decides white or black text
         dark = 0.2126 * red + 0.7152 * green + 0.0722 * blue < 0.5
         ax.text(c, r, fmt.format(v), ha="center", va="center", fontsize=9, color="white" if dark else INK)
     if highlight:
@@ -79,6 +81,7 @@ def heatmap(ax, table, cmap, vmin, vmax, fmt, highlight=None):
 
 
 def dataset_overview():
+    """Figure 1: label counts, agreement groups and split sizes."""
     summary = json.load(open(metric("preprocessing_summary.json")))
     panels = [("Sentiment labels", summary["label_counts"], ["positive", "negative", "neutral"], "Positive,Negative,Neutral"),
               ("Text and image agreement", summary["mismatch_counts"], ["agreement", "soft_mismatch", "hard_mismatch"], "Agreement,Soft mismatch,Hard mismatch"),
@@ -99,6 +102,7 @@ def dataset_overview():
 
 
 def model_comparison():
+    """Figure 3: test macro-F1 for every family and setup, with the chosen model outlined."""
     summary = pd.read_csv(metric("summary_mean_over_seeds.csv"))
     table = summary.pivot(index="setup", columns="family", values="test_macro_f1").reindex(index=list(SETUPS), columns=list(FAMILIES))
     table.index, table.columns = list(SETUPS.values()), list(FAMILIES.values())
@@ -112,6 +116,7 @@ def model_comparison():
 
 
 def per_class():
+    """Figure 4: precision, recall and F1 per class for the chosen model."""
     table = pd.read_csv(metric("per_class_metrics.csv"), index_col=0)
     fig, ax = plt.subplots(figsize=(7.6, 3.8))
     series = [("Precision", table["precision"], BLUE), ("Recall", table["recall"], ORANGE), ("F1", table["f1"], AQUA)]
@@ -124,6 +129,7 @@ def per_class():
 
 
 def confusion():
+    """Figure 5: confusion matrix of the chosen model on the test split."""
     table = pd.read_csv(metric("confusion_matrix_seed0.csv"), index_col=0)
     table.index = [label.capitalize() for label in table.index]
     table.columns = [label.capitalize() for label in table.columns]
@@ -136,6 +142,7 @@ def confusion():
 
 
 def robustness():
+    """Figure 6: macro-F1 when the image or the text is replaced by its mean embedding."""
     table = pd.read_csv(metric("robustness_missing_modality.csv"), index_col=0)
     fig, ax = plt.subplots(figsize=(7.6, 3.8))
     series = [("Both modalities", table["f1_full"], BLUE), ("Image masked", table["f1_no_image"], ORANGE), ("Text masked", table["f1_no_text"], AQUA)]
@@ -148,10 +155,11 @@ def robustness():
 
 
 def gate_coefficients():
+    """Figure 7: the gate's logistic regression coefficients."""
     table = pd.read_csv(metric("gate_coefficients.csv"), index_col=0)
     table.columns = [label.capitalize() for label in table.columns]
     fig, ax = plt.subplots(figsize=(6.2, 5))
-    limit = np.abs(table.to_numpy()).max()
+    limit = np.abs(table.to_numpy()).max()   # symmetric scale, so white means zero
     heatmap(ax, table, DIVERGING, -limit, limit, "{:+.2f}")
     ax.xaxis.tick_top()
     ax.set_title("Gate coefficients: effect on each class's log-odds (seed 0)", loc="left", pad=26)
@@ -159,6 +167,7 @@ def gate_coefficients():
 
 
 def bias_variance():
+    """Figure 8: training and validation macro-F1 as C changes."""
     curve = pd.read_csv(metric("bias_variance_curve.csv"), index_col=0)
     fig, axes = plt.subplots(1, 2, figsize=(10, 3.8), sharey=True)
     for ax, name, title in zip(axes, ["early", "late"], ["Early fusion", "Late fusion"]):
@@ -179,6 +188,7 @@ def bias_variance():
 
 
 def permutation_importance():
+    """Figure 9: drop in macro-F1 when a modality, or a group of gate inputs, is shuffled."""
     modality = pd.read_csv(metric("permutation_importance_modality.csv"))
     gate = pd.read_csv(metric("permutation_importance_gate.csv"), index_col=0)
     fig, (left, right) = plt.subplots(1, 2, figsize=(12, 3.9), gridspec_kw={"width_ratios": [1, 1.25]})
