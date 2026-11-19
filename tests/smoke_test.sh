@@ -12,7 +12,8 @@ MVSA_ROOT="$WORK/data" MVSA_RUNS="$WORK/runs" MVSA_QUICK=1 MVSA_INSTALL_EXTRAS=0
   MVSA_CLIP_MODEL=hf-internal-testing/tiny-random-CLIPModel \
   bash "$REPO/scripts/run_all.sh"
 
-for file in preprocessed/posts_preprocessed.csv models/all_runs.csv models/chosen_model.json models/bias_variance_curve.png; do
+for file in preprocessed/posts_preprocessed.csv models/all_runs.csv models/chosen_model.json models/bias_variance_curve.png \
+            models/learning_curve.csv models/bootstrap_intervals.csv models/calibration.csv models/risk_coverage.csv; do
   test -s "$WORK/runs/$file" || { echo "Missing output: $file"; exit 1; }
 done
 echo "Smoke test passed"

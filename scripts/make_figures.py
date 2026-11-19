@@ -215,6 +215,108 @@ def permutation_importance():
     save(fig, "09_permutation_importance.png")
 
 
+def tidy(ax, grid_axis="y"):
+    """Light grid behind the data, no tick marks."""
+    getattr(ax, f"{grid_axis}axis").grid(True, color=GRID, linewidth=0.8)
+    ax.set_axisbelow(True)
+    ax.tick_params(length=0)
+
+
+def learning_curve():
+    """Figure 10: training and validation macro-F1 as the training set grows (notebook 05)."""
+    curve = pd.read_csv(metric("learning_curve.csv"))
+    stats = curve.groupby(["setup", "train_posts"])[["train_macro_f1", "val_macro_f1"]].agg(["mean", "std"]).fillna(0)
+    fig, axes = plt.subplots(1, 2, figsize=(10, 3.8), sharey=True)
+    for ax, name in zip(axes, ["late", "early"]):
+        s = stats.loc[name]
+        for col, colour, label in (("train_macro_f1", BLUE, "Training"), ("val_macro_f1", ORANGE, "Validation")):
+            mean, std = s[(col, "mean")], s[(col, "std")]
+            ax.plot(s.index, mean, marker="o", markersize=6, linewidth=2, color=colour, label=label)
+            ax.fill_between(s.index, mean - std, mean + std, color=colour, alpha=0.15, linewidth=0)   # ± 1 std over seeds
+        ax.set_xlabel("Training posts")
+        ax.set_title(f"{'Late' if name == 'late' else 'Early'} fusion", loc="left")
+        tidy(ax)
+    axes[0].set_ylabel("Macro-F1")
+    axes[0].legend(loc="lower right")
+    fig.tight_layout()
+    save(fig, "10_learning_curve.png")
+
+
+def confidence_intervals():
+    """Figure 11: test scores of each setup with 95% bootstrap intervals (notebook 05)."""
+    table = pd.read_csv(metric("bootstrap_intervals.csv"), index_col=0).reindex(list(SETUPS)).dropna(how="all")
+    names = [SETUPS[s] for s in table.index][::-1]   # first setup at the top
+    fig, axes = plt.subplots(1, 2, figsize=(10, 3.6), sharey=True)
+    for ax, key, title in zip(axes, ["macro_f1", "accuracy"], ["Test macro-F1", "Test accuracy"]):
+        mid, low, high = (table[c].to_numpy()[::-1] for c in (key, f"{key}_low", f"{key}_high"))
+        y = np.arange(len(names))
+        ax.hlines(y, low, high, color=BLUE, linewidth=2)
+        ax.plot(mid, y, "o", color=BLUE, markersize=7, markeredgecolor=SURFACE, markeredgewidth=1.5)
+        for yy, m, h in zip(y, mid, high):
+            ax.text(h + 0.006, yy, f"{m:.3f}", va="center", fontsize=8, color=MUTED)
+        ax.set_yticks(y, names)
+        ax.set_title(title, loc="left")
+        ax.set_xlim(min(table[f"{key}_low"].min() - 0.03, 0.4), table[f"{key}_high"].max() + 0.06)
+        tidy(ax, "x")
+    fig.suptitle("Chosen family, seed 0: point estimate and 95% bootstrap interval over test posts",
+                 x=0.01, ha="left", fontsize=11, fontweight="bold")
+    fig.tight_layout()
+    save(fig, "11_confidence_intervals.png")
+
+
+def calibration():
+    """Figure 12: reliability diagrams before and after temperature scaling (notebook 05)."""
+    bins = pd.read_csv(metric("reliability_bins.csv"))
+    summary = pd.read_csv(metric("calibration.csv")).set_index(["model", "version"])
+    models = [m for m in ("chosen", "followup") if m in set(bins["model"])]
+    titles = {"chosen": "Chosen model", "followup": "Follow-up model (demo)"}
+    fig, axes = plt.subplots(1, len(models), figsize=(5 * len(models), 4.4), sharey=True, squeeze=False)
+    for ax, model in zip(axes[0], models):
+        ax.plot([0, 1], [0, 1], color=MUTED, linewidth=1, linestyle=(0, (3, 3)), label="Perfectly calibrated")
+        # Scaled line dashed with square markers, so it stays visible when it lies on top of the raw one
+        for version, colour, style, mark in (("raw", BLUE, "-", "o"), ("temperature scaled", ORANGE, "--", "s")):
+            b = bins[(bins.model == model) & (bins.version == version) & (bins.posts > 0)]
+            ece = summary.loc[(model, version), "ece"]
+            label = f"{version.capitalize()} (ECE {ece:.3f})"
+            if version != "raw":
+                label = f"Temperature {summary.loc[(model, version), 'temperature']:.2f} (ECE {ece:.3f})"
+            ax.plot(b["confidence"], b["accuracy"], marker=mark, markersize=6, linewidth=2, linestyle=style,
+                    color=colour, label=label)
+        ax.set_xlim(0.3, 1)
+        ax.set_ylim(0, 1.02)
+        ax.set_xlabel("Mean top probability in the bin")
+        ax.set_title(titles[model], loc="left")
+        ax.legend(loc="upper left", frameon=True, facecolor=SURFACE, edgecolor=GRID, framealpha=0.9)
+        tidy(ax)
+    axes[0][0].set_ylabel("Share right in the bin")
+    fig.tight_layout()
+    save(fig, "12_calibration.png")
+
+
+def risk_coverage():
+    """Figure 13: accuracy on the posts kept when the model abstains below a confidence threshold (notebook 05)."""
+    table = pd.read_csv(metric("risk_coverage.csv"))
+    fig, ax = plt.subplots(figsize=(7.6, 4))
+    for model, colour, name in (("chosen", BLUE, "Chosen model"), ("followup", ORANGE, "Follow-up model (demo)")):
+        t = table[(table.model == model) & (table.posts > 0)]
+        if t.empty:
+            continue
+        ax.plot(t["coverage"], t["accuracy"], marker="o", markersize=5, linewidth=2, color=colour, label=name)
+        for cut in (0.45, 0.70):   # the demo's low and high confidence cut-offs
+            row = t[np.isclose(t["threshold"], cut)]
+            if len(row):
+                c, a = row["coverage"].iloc[0], row["accuracy"].iloc[0]
+                ax.plot(c, a, "o", markersize=11, markerfacecolor="none", markeredgecolor=INK, markeredgewidth=1.5)
+                ax.annotate(f"{cut:.2f}", (c, a), xytext=(7, -13), textcoords="offset points", fontsize=8, color=MUTED)
+    ax.invert_xaxis()   # read left to right as the model gets pickier
+    ax.set_xlabel("Coverage (share of test posts the model answers)")
+    ax.set_ylabel("Accuracy on those posts")
+    ax.set_title("Answering only when sure (ringed: the demo's 0.45 and 0.70 cut-offs)", loc="left")
+    ax.legend(loc="lower right")
+    tidy(ax)
+    save(fig, "13_risk_coverage.png")
+
+
 if __name__ == "__main__":
     os.makedirs(FIGURES, exist_ok=True)
     dataset_overview()
@@ -225,3 +327,10 @@ if __name__ == "__main__":
     gate_coefficients()
     bias_variance()
     permutation_importance()
+    # Figures 10 to 13 come from notebook 05; skip them until its results are in results/metrics
+    for draw, needs in ((learning_curve, "learning_curve.csv"), (confidence_intervals, "bootstrap_intervals.csv"),
+                        (calibration, "reliability_bins.csv"), (risk_coverage, "risk_coverage.csv")):
+        if os.path.exists(metric(needs)):
+            draw()
+        else:
+            print(f"Skipped {draw.__name__}: {needs} not in results/metrics yet")
