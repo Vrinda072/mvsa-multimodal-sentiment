@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from mvsa.explain import entropy, explain_embeddings, explain_example, js_divergence  # noqa: E402
 from mvsa.predict import SentimentModel  # noqa: E402
 
+# Small stand-ins for the real sizes (512-d embeddings, 5,000 terms), so the tests run instantly
 DIMENSIONS = 12
 TERMS = ["bad", "day", "good", "good day", "sad"]
 
@@ -22,11 +23,13 @@ def synthetic_model_and_stats():
     arrays = {"labels": np.array(["negative", "neutral", "positive"]), "neutral_multiplier": 0.75, "clip_model": "unused",
               "words_terms": np.array(TERMS), "words_idf": np.ones(len(TERMS)),
               "words_coef": rng.normal(size=(3, len(TERMS))), "words_intercept": rng.normal(size=3)}
+    # Random weights and scalers for the two fused models and the two separate readings
     for name in ("text", "image", "own_text", "own_image"):
         arrays.update({f"{name}_mean": rng.normal(size=DIMENSIONS), f"{name}_scale": rng.uniform(0.5, 2, DIMENSIONS),
                        f"{name}_coef": rng.normal(size=(3, DIMENSIONS)), f"{name}_intercept": rng.normal(size=3)})
     path = os.path.join(tempfile.mkdtemp(), "model.npz")
     np.savez(path, **arrays)
+    # Statistics in the same layout as explainer_stats.npz; the map axes are the first two dimensions
     stats = {"similarity_sorted": np.linspace(-0.5, 0.5, 101), "example_id": np.array("7"),
              "example_caption": np.array("good day"), "example_image_url": np.array("https://example.org/7.jpg"),
              "example_text": rng.normal(size=DIMENSIONS), "example_image": rng.normal(size=DIMENSIONS)}
@@ -44,11 +47,13 @@ class ExplainTests(unittest.TestCase):
         cls.text, cls.image = rng.normal(size=(1, DIMENSIONS)), rng.normal(size=(1, DIMENSIONS))
         cls.caption = "good day, not a bad day"
         cls.words = cls.model.words_vector(cls.caption)
+        # One explanation with every input given, shared by most tests below
         cls.full = explain_embeddings(cls.model, cls.stats, cls.caption, cls.text, cls.image, cls.words)
 
     def test_pushes_add_up_to_the_class_scores(self):
         for name in ("text", "image"):
             branch = self.full["branches"][name]
+            # The listed dimensions, the rest and the intercept must add up to each class score
             total = np.sum([t["push"] for t in branch["top"]], axis=0) + branch["rest"] + branch["intercept"]
             np.testing.assert_allclose(total, branch["logits"], atol=2e-3)
         words = self.full["branches"]["words"]
@@ -66,6 +71,7 @@ class ExplainTests(unittest.TestCase):
         expected = self.model.proba_from_embeddings(self.text, self.image, self.words)[0]
         np.testing.assert_allclose(self.full["final"], expected, atol=1e-4)
         np.testing.assert_allclose(np.sum(self.full["average"]), 1, atol=1e-3)
+        # Repeat the combination by hand: neutral x 0.75, then renormalise
         scaled = np.array(self.full["average"]) * [1, 0.75, 1]
         np.testing.assert_allclose(self.full["scaled"], scaled, atol=1e-4)
         np.testing.assert_allclose(self.full["final"], scaled / scaled.sum(), atol=1e-3)
@@ -75,6 +81,7 @@ class ExplainTests(unittest.TestCase):
         agreement = self.full["agreement"]
         cos = float(self.text[0] @ self.image[0] / (np.linalg.norm(self.text) * np.linalg.norm(self.image)))
         self.assertAlmostEqual(agreement["cos"], cos, places=3)
+        # cos_pct should be the share of training posts with a lower similarity
         share_below = float((self.stats["similarity_sorted"] < cos).mean() * 100)
         self.assertAlmostEqual(agreement["cos_pct"], share_below, delta=1.0)
         self.assertEqual(sum(agreement["hist"]), 101)

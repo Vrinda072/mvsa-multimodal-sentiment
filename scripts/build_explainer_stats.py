@@ -14,8 +14,10 @@ import os
 import numpy as np
 import pandas as pd
 
+# Repository root, so the default output path works from any working directory
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LABELS = ["negative", "neutral", "positive"]
+# Training posts drawn on each embedding map (a sample keeps the page fast)
 MAP_POINTS = 900
 # A test post the saved model gets right, with the same label for its text and its image. The dataset's pictures
 # are not redistributed here, so the page loads this one from a public copy of the dataset.
@@ -29,19 +31,25 @@ def main():
     parser.add_argument("--out", default=os.path.join(ROOT, "results", "model", "explainer_stats.npz"))
     args = parser.parse_args()
 
+    # Load the training posts' labels and their CLIP caption and image embeddings
     features = os.path.join(args.preprocessed, "features")
     posts = pd.read_csv(os.path.join(args.preprocessed, "posts_preprocessed.csv"), dtype={"id": str},
                         keep_default_na=False).set_index("id")
     ids = np.loadtxt(os.path.join(features, "train_ids.txt"), dtype=str)
     train = {m: np.load(os.path.join(features, f"train_clip_{m}.npy")) for m in ("text", "image")}
 
+    # Cosine similarity between each training post's caption and picture. It is saved sorted, so the page
+    # can find what share of training posts a new post's similarity exceeds
     similarity = (train["text"] * train["image"]).sum(axis=1) / (
         np.linalg.norm(train["text"], axis=1) * np.linalg.norm(train["image"], axis=1))
     arrays = {"similarity_sorted": np.sort(similarity).astype(np.float32)}
 
+    # A fixed random sample of training posts for the maps (seed 0, so the maps never change)
     sample = np.random.default_rng(0).choice(len(ids), min(MAP_POINTS, len(ids)), replace=False)
     code = {label: i for i, label in enumerate(LABELS)}
     for m, X in train.items():
+        # PCA by singular value decomposition: centre the embeddings, then the rows of axes are the
+        # principal directions, and the squared singular values give the variance along each
         mean = X.mean(axis=0)
         _, singular, axes = np.linalg.svd(X - mean, full_matrices=False)
         variance = singular ** 2 / (singular ** 2).sum()
@@ -50,6 +58,7 @@ def main():
                        f"map_{m}_points": ((X[sample] - mean) @ axes[:2].T).astype(np.float32),
                        f"map_{m}_labels": posts.loc[ids[sample], f"{m}_label"].map(code).to_numpy(dtype=np.int8)})
 
+    # The example post shown when the page opens: its caption and both CLIP embeddings
     test_ids = list(np.loadtxt(os.path.join(features, "test_ids.txt"), dtype=str))
     k = test_ids.index(EXAMPLE_ID)
     arrays.update(example_id=np.array(EXAMPLE_ID), example_caption=np.array(posts.loc[EXAMPLE_ID, "text_raw"]),
@@ -57,6 +66,7 @@ def main():
                   example_text=np.load(os.path.join(features, "test_clip_text.npy"))[k].astype(np.float32),
                   example_image=np.load(os.path.join(features, "test_clip_image.npy"))[k].astype(np.float32))
 
+    # Save everything in one compressed file
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     np.savez_compressed(args.out, **arrays)
     print(f"Saved {args.out} ({os.path.getsize(args.out) / 1024:.0f} KB): {len(ids)} training posts, "

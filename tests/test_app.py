@@ -7,16 +7,19 @@ from io import BytesIO
 
 from PIL import Image
 
+# Import the server's functions directly from app/
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
 from server import read_request, run_prediction  # noqa: E402
 
 
+# Stand-in for the real model: it returns what it received, so the tests can check the request handling
 class FakeModel:
     def predict(self, text, image):
         return {"text": text, "has_image": image is not None}
 
 
+# A tiny valid PNG, encoded the way the page sends pictures (a base64 data URL)
 def encoded_png():
     buffer = BytesIO()
     Image.new("RGB", (4, 4)).save(buffer, "PNG")

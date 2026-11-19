@@ -13,10 +13,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from mvsa.predict import SentimentModel, tfidf_vector  # noqa: E402
 
+# A few captions to fit a small TF-IDF vectoriser on
 CAPTIONS = ["best day ever", "worst day ever", "meeting at noon", "I love this love this", "so sad today",
             "Reading the newspaper", "happy happy day", "terrible news today", "just a photo of lunch"]
 
 
+# Fit a scaler and logistic regression the same way scripts/train_final_model.py does
 def fit(X, y):
     scaler = StandardScaler().fit(X)
     return scaler, LogisticRegression(class_weight="balanced", max_iter=1000).fit(scaler.transform(X), y)
@@ -26,6 +28,7 @@ class PredictTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         rng = np.random.default_rng(0)
+        # Random labels, with embeddings shifted by the label so the models have something to learn
         cls.y = rng.integers(0, 3, 90)
         cls.text = rng.normal(size=(90, 8)) + cls.y[:, None]
         cls.image = rng.normal(size=(90, 8)) - cls.y[:, None]
@@ -33,6 +36,7 @@ class PredictTests(unittest.TestCase):
         cls.tfidf = TfidfVectorizer(lowercase=True, ngram_range=(1, 2), sublinear_tf=True).fit(CAPTIONS)
         cls.words = cls.tfidf.transform([CAPTIONS[i % len(CAPTIONS)] for i in range(90)])
         cls.words_fit = LogisticRegression(class_weight="balanced", max_iter=1000).fit(cls.words, cls.y)
+        # Save the fitted models in the same .npz layout as the real final_model.npz
         cls.folder = tempfile.mkdtemp()
         path = os.path.join(cls.folder, "model.npz")
         arrays = {}
@@ -45,6 +49,7 @@ class PredictTests(unittest.TestCase):
                  words_intercept=cls.words_fit.intercept_, **arrays)
         cls.model = SentimentModel(path)
 
+    # Reference probabilities from scikit-learn, to compare with the hand-written prediction code
     def sklearn_proba(self, fitted, X):
         scaler, model = fitted
         return model.predict_proba(scaler.transform(X))
@@ -57,6 +62,7 @@ class PredictTests(unittest.TestCase):
 
     def test_tfidf_matches_scikit_learn(self):
         vocabulary = {t: i for i, t in enumerate(sorted(self.tfidf.vocabulary_, key=self.tfidf.vocabulary_.get))}
+        # Include repeated words, unseen words and an empty caption
         for caption in CAPTIONS + ["love love LOVE this day!", "words never seen", ""]:
             np.testing.assert_allclose(tfidf_vector(caption, vocabulary, self.tfidf.idf_),
                                        self.tfidf.transform([caption]).toarray()[0])
@@ -64,6 +70,7 @@ class PredictTests(unittest.TestCase):
     def test_fusion_averages_three_models_and_scales_neutral(self):
         expected = (self.sklearn_proba(self.text_fit, self.text) + self.sklearn_proba(self.image_fit, self.image)
                     + self.words_fit.predict_proba(self.words)) / 3
+        # Column 1 is neutral
         expected[:, 1] *= 0.75
         expected /= expected.sum(axis=1, keepdims=True)
         np.testing.assert_allclose(self.model.proba_from_embeddings(self.text, self.image, self.words.toarray()), expected)
@@ -88,6 +95,7 @@ class PredictTests(unittest.TestCase):
         path = os.path.join(self.folder, f"readings_{text_says}_{image_says}.npz")
         arrays = dict(np.load(os.path.join(self.folder, "model.npz")))
         for name, says in (("text", text_says), ("image", image_says)):
+            # Zero weights and a large intercept on one class: the reading always picks that class
             arrays.update({f"own_{name}_mean": np.zeros(8), f"own_{name}_scale": np.ones(8), f"own_{name}_coef": np.zeros((3, 8)),
                            f"own_{name}_intercept": np.eye(3)[["negative", "neutral", "positive"].index(says)] * 5})
         np.savez(path, **arrays)

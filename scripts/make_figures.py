@@ -6,6 +6,7 @@ import json
 import os
 
 import matplotlib
+# Draw to files without opening windows, so the script also runs on a server
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,14 +17,18 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 METRICS = os.path.join(ROOT, "results", "metrics")
 FIGURES = os.path.join(ROOT, "results", "figures")
 
+# Colours shared by every figure: background, text, secondary text and grid lines
 SURFACE, INK, MUTED, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"
+# Light-to-dark blue for scores and counts; orange-grey-blue for values that can be negative
 SEQUENTIAL = LinearSegmentedColormap.from_list("blue", ["#eef4fb", "#8db8ea", BLUE, "#154a8a"])
 DIVERGING = LinearSegmentedColormap.from_list("polarity", [ORANGE, "#efeeea", BLUE])
+# Display names for the classifier and setup codes used in the metrics files
 FAMILIES = {"logreg": "Logistic regression", "linear_svm": "Linear SVM", "random_forest": "Random forest", "mlp": "MLP"}
 SETUPS = {"baseline_tfidf_hist": "Baseline", "text_only": "Text only", "image_only": "Image only", "early": "Early fusion",
           "early_meta": "Early + meta", "late": "Late fusion", "gated": "Gated fusion"}
 
+# One consistent style for all figures
 plt.rcParams.update({
     "figure.facecolor": SURFACE, "axes.facecolor": SURFACE, "savefig.facecolor": SURFACE, "font.size": 10,
     "text.color": INK, "axes.labelcolor": MUTED, "xtick.color": MUTED, "ytick.color": MUTED, "axes.edgecolor": GRID,
@@ -32,10 +37,12 @@ plt.rcParams.update({
 })
 
 
+# Path to one file in results/metrics
 def metric(name):
     return os.path.join(METRICS, name)
 
 
+# Write a figure to results/figures and free its memory
 def save(fig, name):
     fig.savefig(os.path.join(FIGURES, name), dpi=170, bbox_inches="tight")
     plt.close(fig)
@@ -46,6 +53,7 @@ def bars(ax, groups, series, width=0.26, fmt="{:.2f}"):
     """Grouped bars with a gap between bars and a value above each one."""
     x = np.arange(len(groups))
     for i, (label, values, colour) in enumerate(series):
+        # Centre the group of bars on each x position
         offset = (i - (len(series) - 1) / 2) * width
         drawn = ax.bar(x + offset, values, width - 0.025, color=colour, label=label)
         ax.bar_label(drawn, labels=[fmt.format(v) for v in values], padding=2, fontsize=8, color=MUTED)
@@ -58,11 +66,13 @@ def bars(ax, groups, series, width=0.26, fmt="{:.2f}"):
 def heatmap(ax, table, cmap, vmin, vmax, fmt, highlight=None):
     """A labelled grid, with text that stays readable on dark and light cells."""
     values = table.to_numpy(dtype=float)
+    # Masked (NaN) cells, such as the baseline's missing classifiers, are left blank
     ax.imshow(np.ma.masked_invalid(values), cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
     ax.set_xticks(range(table.shape[1]), table.columns)
     ax.set_yticks(range(table.shape[0]), table.index)
     ax.tick_params(length=0)
     ax.spines[:].set_visible(False)
+    # White lines between cells, drawn as a grid on the minor ticks
     ax.set_xticks(np.arange(.5, table.shape[1] - 1), minor=True)
     ax.set_yticks(np.arange(.5, table.shape[0] - 1), minor=True)
     ax.grid(which="minor", color=SURFACE, linewidth=2)
@@ -70,14 +80,17 @@ def heatmap(ax, table, cmap, vmin, vmax, fmt, highlight=None):
     for (r, c), v in np.ndenumerate(values):
         if np.isnan(v):
             continue
+        # Use white text on dark cells and black text on light ones (relative luminance below 0.5)
         red, green, blue, _ = cmap((v - vmin) / (vmax - vmin))
         dark = 0.2126 * red + 0.7152 * green + 0.0722 * blue < 0.5
         ax.text(c, r, fmt.format(v), ha="center", va="center", fontsize=9, color="white" if dark else INK)
+    # Outline one cell, e.g. the chosen model
     if highlight:
         r, c = highlight
         ax.add_patch(plt.Rectangle((c - .5, r - .5), 1, 1, fill=False, edgecolor=INK, linewidth=2.5, zorder=5))
 
 
+# Figure 1: label counts, agreement groups and split sizes
 def dataset_overview():
     summary = json.load(open(metric("preprocessing_summary.json")))
     panels = [("Sentiment labels", summary["label_counts"], ["positive", "negative", "neutral"], "Positive,Negative,Neutral"),
@@ -98,8 +111,10 @@ def dataset_overview():
     save(fig, "01_dataset_overview.png")
 
 
+# Figure 3: test macro-F1 for every classifier and setup, with the chosen model outlined
 def model_comparison():
     summary = pd.read_csv(metric("summary_mean_over_seeds.csv"))
+    # Rows = setups, columns = classifiers, in a fixed order
     table = summary.pivot(index="setup", columns="family", values="test_macro_f1").reindex(index=list(SETUPS), columns=list(FAMILIES))
     table.index, table.columns = list(SETUPS.values()), list(FAMILIES.values())
     chosen = json.load(open(metric("chosen_model.json")))
@@ -111,6 +126,7 @@ def model_comparison():
     save(fig, "03_model_comparison.png")
 
 
+# Figure 4: precision, recall and F1 of the chosen model for each class
 def per_class():
     table = pd.read_csv(metric("per_class_metrics.csv"), index_col=0)
     fig, ax = plt.subplots(figsize=(7.6, 3.8))
@@ -123,6 +139,7 @@ def per_class():
     save(fig, "04_per_class_metrics.png")
 
 
+# Figure 5: confusion matrix of the chosen model on the test posts
 def confusion():
     table = pd.read_csv(metric("confusion_matrix_seed0.csv"), index_col=0)
     table.index = [label.capitalize() for label in table.index]
@@ -135,6 +152,7 @@ def confusion():
     save(fig, "05_confusion_matrix.png")
 
 
+# Figure 6: macro-F1 when the image or the text is replaced by its training-set mean
 def robustness():
     table = pd.read_csv(metric("robustness_missing_modality.csv"), index_col=0)
     fig, ax = plt.subplots(figsize=(7.6, 3.8))
@@ -147,10 +165,12 @@ def robustness():
     save(fig, "06_missing_modality.png")
 
 
+# Figure 7: the gate's coefficients; blue raises a class's score and orange lowers it
 def gate_coefficients():
     table = pd.read_csv(metric("gate_coefficients.csv"), index_col=0)
     table.columns = [label.capitalize() for label in table.columns]
     fig, ax = plt.subplots(figsize=(6.2, 5))
+    # Symmetric colour range, so zero is always the neutral grey
     limit = np.abs(table.to_numpy()).max()
     heatmap(ax, table, DIVERGING, -limit, limit, "{:+.2f}")
     ax.xaxis.tick_top()
@@ -158,6 +178,7 @@ def gate_coefficients():
     save(fig, "07_gate_coefficients.png")
 
 
+# Figure 8: training and validation macro-F1 as regularisation weakens (larger C)
 def bias_variance():
     curve = pd.read_csv(metric("bias_variance_curve.csv"), index_col=0)
     fig, axes = plt.subplots(1, 2, figsize=(10, 3.8), sharey=True)
@@ -178,6 +199,7 @@ def bias_variance():
     save(fig, "08_bias_variance_curve.png")
 
 
+# Figure 9: drop in test macro-F1 when one input is shuffled across posts
 def permutation_importance():
     modality = pd.read_csv(metric("permutation_importance_modality.csv"))
     gate = pd.read_csv(metric("permutation_importance_gate.csv"), index_col=0)
@@ -206,6 +228,8 @@ def permutation_importance():
 
 
 if __name__ == "__main__":
+    # Draw every figure from the saved metrics. Figure 2 (feature scaling) is drawn by the feature-engineering
+    # notebook (scaling_n_chars.png), not by this script
     os.makedirs(FIGURES, exist_ok=True)
     dataset_overview()
     model_comparison()

@@ -27,11 +27,14 @@ from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precisio
 from sklearn.preprocessing import StandardScaler
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Make the mvsa package in src/ importable
 sys.path.insert(0, os.path.join(ROOT, "src"))
 from mvsa.predict import tfidf_vector  # noqa: E402
 
 LABELS = ["negative", "neutral", "positive"]
+# Column of the neutral class in every probability array
 NEUTRAL_INDEX = LABELS.index("neutral")
+# Saved with the model, so predictions use the same CLIP as training
 CLIP_MODEL = "openai/clip-vit-base-patch32"
 # For the separate text and image readings. Chosen on the validation set from 0.0001, 0.001, 0.01 and 0.1:
 # best macro-F1 against each modality's own labels, for both text and image.
@@ -47,7 +50,9 @@ def load_split(folder, split):
                         keep_default_na=False).set_index("id")
     ids = np.loadtxt(os.path.join(features, f"{split}_ids.txt"), dtype=str, ndmin=1)
     code = {label: i for i, label in enumerate(LABELS)}
+    # Labels as numbers: 0 negative, 1 neutral, 2 positive
     y = posts.loc[ids, "label"].map(code).fillna(-1).to_numpy(dtype=int)   # -1: hard mismatch, no label
+    # Each part's own label, used to train the separate caption and picture readings
     own = {m: posts.loc[ids, f"{m}_label"].map(code).to_numpy(dtype=int) for m in ("text", "image")}
     return {"text": np.load(os.path.join(features, f"{split}_clip_text.npy")),
             "image": np.load(os.path.join(features, f"{split}_clip_image.npy")),
@@ -57,15 +62,19 @@ def load_split(folder, split):
 
 def fit(X, y, C):
     """Fit one CLIP modality's model, with the same settings as in src/mvsa/modeling.py."""
+    # Standardise each embedding dimension with training-set statistics, then fit the logistic regression.
+    # class_weight="balanced" gives the rare neutral class as much total weight as the other classes
     scaler = StandardScaler().fit(X)
     model = LogisticRegression(C=C, class_weight="balanced", max_iter=5000).fit(scaler.transform(X), y)
     return scaler, model
 
 
+# Class probabilities from one fitted scaler and model
 def proba(scaler, model, X):
     return model.predict_proba(scaler.transform(X))
 
 
+# All metrics for one set of predictions: macro and per-class scores, plus the confusion matrix
 def scores(y, pred):
     p, r, f, _ = precision_recall_fscore_support(y, pred, labels=[0, 1, 2], zero_division=0)
     return {"macro_f1": round(f.mean(), 4), "accuracy": round(accuracy_score(y, pred), 4),
@@ -81,6 +90,8 @@ def main():
     args = parser.parse_args()
     warnings.filterwarnings("ignore", category=UserWarning)
 
+    # Settings of the main model (chosen in the modelling notebooks) and of the follow-up model
+    # (chosen by scripts/select_followup_model.py)
     chosen = json.load(open(os.path.join(ROOT, "results", "metrics", "chosen_model.json")))
     main_C, main_w = chosen["config"]["hp"]["text"]["C"], chosen["config"]["late_w"]
     cfg = json.load(open(os.path.join(ROOT, "results", "metrics", "followup_selection.json")))["chosen"]
@@ -88,22 +99,28 @@ def main():
         raise SystemExit("This script saves the late fusion of CLIP text, CLIP image and TF-IDF models only.")
     C, neutral = cfg["C"], cfg["neutral"]
 
+    # Train every model on the training split only
     train = load_split(args.preprocessed, "train")
     y = train["y"]
+    # The follow-up model's three parts
     text_scaler, text_model = fit(train["text"], y, C)
     image_scaler, image_model = fit(train["image"], y, C)
     words_model = LogisticRegression(class_weight="balanced", max_iter=5000).fit(train["words"], y)
+    # The main model's two parts, retrained here so the two models can be compared on the same posts
     main_text = fit(train["text"], y, main_C)
     main_image = fit(train["image"], y, chosen["config"]["hp"]["image"]["C"])
+    # Separate readings: models trained on each part's own label instead of the post label
     own_text_scaler, own_text_model = fit(train["text"], train["own"]["text"], OWN_LABEL_C)
     own_image_scaler, own_image_model = fit(train["image"], train["own"]["image"], OWN_LABEL_C)
 
+    # Follow-up model: average the three models' probabilities, scale down neutral and renormalise
     def followup(d):
         p = (proba(text_scaler, text_model, d["text"]) + proba(image_scaler, image_model, d["image"])
              + words_model.predict_proba(d["words"])) / 3
         p[:, NEUTRAL_INDEX] *= neutral
         return p / p.sum(1, keepdims=True)
 
+    # Main model: weighted average of the text and image models (late fusion)
     def main_model(d):
         return main_w * proba(*main_text, d["text"]) + (1 - main_w) * proba(*main_image, d["image"])
 
@@ -111,10 +128,12 @@ def main():
     tfidf = joblib.load(os.path.join(args.preprocessed, "artifacts", "tfidf.joblib"))
     terms = np.array(sorted(tfidf.vocabulary_, key=tfidf.vocabulary_.get))
 
+    # Score both models on validation and test; the results go to followup_results.json
     report = {"followup_config": cfg, "trained_on": "training split", "splits": {}}
     for split in ("val", "test"):
         d = load_split(args.preprocessed, split)
         pf, pm = followup(d), main_model(d)
+        # Predicted class = the most probable class
         f, m = pf.argmax(1), pm.argmax(1)
         report["splits"][split] = {"followup": scores(d["y"], f), "main_model": scores(d["y"], m)}
         print(f"{split:5s} follow-up  macro-F1 {f1_score(d['y'], f, average='macro'):.4f}  accuracy {accuracy_score(d['y'], f):.4f}")
@@ -124,6 +143,7 @@ def main():
             print(f"      {name} reading vs {name} labels: macro-F1 {f1_score(d['own'][name], p, average='macro'):.4f}  "
                   f"neutral F1 {f1_score(d['own'][name], p, average=None, labels=[1])[0]:.4f}")
         if split == "val":
+            # How often predictions were right at each confidence level, on validation posts
             top, right = pf.max(1), f == d["y"]
             levels = {"high": top >= HIGH_CONFIDENCE, "medium": (top >= LOW_CONFIDENCE) & (top < HIGH_CONFIDENCE),
                       "low": top < LOW_CONFIDENCE}
@@ -135,6 +155,8 @@ def main():
             mine = np.vstack([tfidf_vector(t, {w: i for i, w in enumerate(terms)}, tfidf.idf_) for t in d["text_clean"]])
             assert np.allclose(mine, d["words"].toarray()), "TF-IDF in predict.py differs from the training features"
         else:
+            # McNemar test on the test split: compare only the posts where exactly one model is right.
+            # If the models were equally good, each would be the one right about half the time
             b = int(((f == d["y"]) & (m != d["y"])).sum())
             c = int(((f != d["y"]) & (m == d["y"])).sum())
             report["mcnemar_test"] = {"followup_only_right": b, "main_only_right": c,
@@ -152,6 +174,8 @@ def main():
             report["bootstrap_95_test"] = {k: [round(lo[j], 3), round(hi[j], 3)] for j, k in enumerate(
                 ("followup_macro_f1", "followup_accuracy", "gain_macro_f1", "gain_accuracy"))}
             print("      95% intervals:", report["bootstrap_95_test"])
+    # Hard-mismatch posts have no post label, so report how often each model sides with the text label
+    # and how often with the image label
     hard = load_split(args.preprocessed, "hard")
     posts = pd.read_csv(os.path.join(args.preprocessed, "posts_preprocessed.csv"), dtype={"id": str}).set_index("id")
     hard_ids = np.loadtxt(os.path.join(args.preprocessed, "features", "hard_ids.txt"), dtype=str, ndmin=1)
@@ -163,6 +187,8 @@ def main():
     print("hard-mismatch posts, share matching each label:", report["hard_mismatch_agreement"])
 
     json.dump(report, open(os.path.join(ROOT, "results", "metrics", "followup_results.json"), "w"), indent=1)
+    # Save every weight and scaler as plain arrays, so src/mvsa/predict.py needs neither scikit-learn
+    # nor pickled objects to load the model
     out = os.path.join(ROOT, "results", "model", "final_model.npz")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     np.savez_compressed(out, labels=np.array(LABELS), clip_model=CLIP_MODEL, neutral_multiplier=neutral,

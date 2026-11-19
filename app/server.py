@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from io import BytesIO
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
+# Make the mvsa package in src/ importable when the server is started directly
 sys.path.insert(0, os.path.join(APP_DIR, "..", "src"))
 
 MAX_BODY_BYTES = 30 * 1024 * 1024   # a 20 MB image grows by about a third when base64-encoded
@@ -28,15 +29,19 @@ def read_request(payload, need_input=True):
     """Validate one request from the page and return its caption and picture. Raises ValueError for bad input."""
     from PIL import Image, UnidentifiedImageError
 
+    # An empty or whitespace-only caption counts as no caption
     text = (payload.get("text") or "").strip() or None
     image = None
     if payload.get("image"):
         try:
+            # The page sends the picture as a data URL ("data:image/jpeg;base64,..."); keep only the base64 part
             data = base64.b64decode(payload["image"].split(",")[-1], validate=True)
+            # verify() checks the file is a readable image without decoding all of it
             with Image.open(BytesIO(data)) as check:
                 check.verify()
         except (binascii.Error, UnidentifiedImageError, OSError, SyntaxError, ValueError):
             raise ValueError(UNREADABLE_IMAGE)
+        # Keep the picture in memory only; it is never written to disk
         image = BytesIO(data)
     if need_input and text is None and image is None:
         raise ValueError("Add a picture, a caption, or both.")
@@ -60,6 +65,7 @@ def run_explanation(model, stats, payload):
     """
     from mvsa.explain import explain_post
 
+    # An uploaded picture always takes priority over the example picture
     use_example = bool(payload.get("example_image")) and not payload.get("image")
     text, image = read_request(payload, need_input=not use_example)
     try:
@@ -68,8 +74,10 @@ def run_explanation(model, stats, payload):
         raise ValueError(UNREADABLE_IMAGE)
 
 
+# Build the request handler class with the model and statistics bound in, so they are loaded only once
 def make_handler(model, stats):
     class Handler(BaseHTTPRequestHandler):
+        # Send one complete HTTP response
         def send_body(self, status, content_type, body):
             self.send_response(status)
             self.send_header("Content-Type", content_type)
@@ -80,6 +88,7 @@ def make_handler(model, stats):
         def send_json(self, status, content):
             self.send_body(status, "application/json", json.dumps(content).encode())
 
+        # GET /example returns the example post's explanation; GET / returns the page itself
         def do_GET(self):
             if self.path == "/example":
                 from mvsa.explain import explain_example
@@ -89,10 +98,12 @@ def make_handler(model, stats):
             with open(os.path.join(APP_DIR, "index.html"), "rb") as f:
                 self.send_body(200, "text/html; charset=utf-8", f.read())
 
+        # POST /predict takes a caption and/or picture as JSON and returns the explained prediction
         def do_POST(self):
             if self.path != "/predict":
                 return self.send_json(404, {"error": "Not found."})
             length = int(self.headers.get("Content-Length") or 0)
+            # Refuse very large uploads before reading them into memory
             if length > MAX_BODY_BYTES:
                 self.close_connection = True
                 return self.send_json(413, {"error": "That image is too large. Please use one under 20 MB."})
@@ -118,14 +129,17 @@ def main():
 
     print("Loading the model. The first run downloads CLIP (about 600 MB), which can take a while...")
     model = SentimentModel()
+    # Load CLIP now rather than on the first request, so the first prediction is not slow
     model._load_clip()
     try:
+        # 127.0.0.1: only this computer can reach the page, not other devices on the network
         server = HTTPServer(("127.0.0.1", args.port), make_handler(model, load_stats()))
     except OSError:
         raise SystemExit(f"Port {args.port} is in use. Try another one: python app/server.py --port {args.port + 1}")
     url = f"http://127.0.0.1:{args.port}"
     print(f"Ready at {url}\nPress Ctrl+C here to stop.")
     if not args.no_browser:
+        # Open the browser half a second later, once the server is listening
         threading.Timer(0.5, webbrowser.open, [url]).start()
     try:
         server.serve_forever()

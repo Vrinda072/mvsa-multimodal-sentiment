@@ -13,7 +13,7 @@ from mvsa.predict import TOKEN_RE, clean_caption, softmax
 
 DEFAULT_STATS = os.path.join(os.path.dirname(__file__), "..", "..", "results", "model", "explainer_stats.npz")
 TOP_DIMENSIONS = 8     # how many embedding dimensions are listed one by one; the rest are summed
-HISTOGRAM_BINS = 30
+HISTOGRAM_BINS = 30    # bars in the histogram of caption-picture similarity across training posts
 
 
 def load_stats(path=DEFAULT_STATS):
@@ -23,27 +23,32 @@ def load_stats(path=DEFAULT_STATS):
 
 
 def rounded(values, digits=4):
+    """Flatten an array into a list of rounded Python floats, so it can be sent to the page as JSON."""
     return [round(float(v), digits) for v in np.ravel(values)]
 
 
 def entropy(p):
     """Shannon entropy in bits: 0 when one class takes everything, log2(3) when three classes are equal."""
     p = np.asarray(p, dtype=float)
+    # Clipping avoids log(0); a class with probability 0 then contributes 0 to the sum, as it should
     return float(-(p * np.log2(np.clip(p, 1e-12, 1))).sum())
 
 
 def js_divergence(p, q):
     """Jensen-Shannon divergence in bits: 0 when two distributions match, 1 when they share nothing."""
     p, q = np.asarray(p, dtype=float), np.asarray(q, dtype=float)
-    m = (p + q) / 2
+    m = (p + q) / 2                       # the average of the two distributions
 
     def kl(a, b):
+        """Kullback-Leibler divergence of a from b, in bits."""
         return float((a * np.log2(np.clip(a, 1e-12, 1) / np.clip(b, 1e-12, 1))).sum())
 
+    # JS is the mean KL divergence of each distribution from their average: symmetric and between 0 and 1
     return 0.5 * kl(p, m) + 0.5 * kl(q, m)
 
 
 def cosine(a, b):
+    """Cosine similarity of two vectors: 1 = same direction, 0 = unrelated."""
     a, b = np.ravel(a), np.ravel(b)
     return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
 
@@ -51,9 +56,10 @@ def cosine(a, b):
 def clip_branch(model, modality, embedding):
     """One CLIP model worked through: z = standardised input, push = z times weight, per class."""
     p = model.parts
-    z = (np.atleast_2d(embedding) - p[f"{modality}_mean"]) / p[f"{modality}_scale"]
-    logits = (z @ p[f"{modality}_coef"].T + p[f"{modality}_intercept"])[0]
+    z = (np.atleast_2d(embedding) - p[f"{modality}_mean"]) / p[f"{modality}_scale"]   # standardise as in training
+    logits = (z @ p[f"{modality}_coef"].T + p[f"{modality}_intercept"])[0]          # one raw score per class
     push = z[0][:, None] * p[f"{modality}_coef"].T            # dimensions x classes
+    # The dimensions that moved the winning class's score the most, in either direction
     top = np.argsort(-np.abs(push[:, int(np.argmax(logits))]))[:TOP_DIMENSIONS]
     return {"z": rounded(z[0], 2), "logits": rounded(logits), "proba": rounded(softmax(logits)),
             "intercept": rounded(p[f"{modality}_intercept"]),
@@ -66,9 +72,10 @@ def words_branch(model, words):
     p = model.parts
     words = np.atleast_2d(words)
     logits = (words @ p["words_coef"].T + p["words_intercept"])[0]
+    # One entry per known term in the caption: its TF-IDF value and how much it pushed each class score
     terms = [{"term": str(p["words_terms"][i]), "w": round(float(words[0, i]), 3),
               "push": rounded(words[0, i] * p["words_coef"][:, i], 3)} for i in np.nonzero(words[0])[0]]
-    terms.sort(key=lambda t: -t["w"])
+    terms.sort(key=lambda t: -t["w"])   # largest TF-IDF value first
     return {"logits": rounded(logits), "proba": rounded(softmax(logits)), "intercept": rounded(p["words_intercept"])}, terms
 
 
@@ -78,6 +85,7 @@ def embedding_map(stats, modality, embedding):
               for (x, y), label in zip(stats[f"map_{modality}_points"], stats[f"map_{modality}_labels"])]
     here = None
     if embedding is not None:
+        # Project this post with the same PCA (centre, then multiply by the two saved axes)
         here = rounded((np.ravel(embedding) - stats[f"map_{modality}_mean"]) @ stats[f"map_{modality}_axes"].T, 3)
     return {"pts": points, "me": here, "var": rounded(stats[f"map_{modality}_variance"], 3)}
 
@@ -86,6 +94,7 @@ def explain_embeddings(model, stats, caption=None, text=None, image=None, words=
     """The prediction for one post plus everything behind it. text and image are CLIP embeddings, or None."""
     result = model.predict_embeddings(text, image, words)
     both = text is not None and image is not None
+    # Work through each model that has an input: the picture model, the caption model and the word model
     branches, terms = {}, []
     if image is not None:
         branches["image"] = clip_branch(model, "image", image)
@@ -102,17 +111,20 @@ def explain_embeddings(model, stats, caption=None, text=None, image=None, words=
                         for name, r in result["readings"].items()},
            "neutral_multiplier": model.neutral_multiplier}
     if both and "words" in branches:
+        # Repeat the combination steps of the fused model, so the page can show each one
         average = np.mean([branches[k]["proba"] for k in ("text", "image", "words")], axis=0)
         scaled = average.copy()
         scaled[model.labels.index("neutral")] *= model.neutral_multiplier
         out.update(average=rounded(average), scaled=rounded(scaled))
 
+    # Agreement between caption and picture, compared with the caption-picture similarity of every training post
     sorted_cos = stats["similarity_sorted"]
     hist, edges = np.histogram(sorted_cos, bins=HISTOGRAM_BINS)
     agreement = {"hist": hist.tolist(), "edges": rounded(edges), "median": round(float(np.median(sorted_cos)), 3),
                  "posts": int(len(sorted_cos)), "H_final": round(entropy(out["final"]), 3)}
     if both:
         cos = cosine(text, image)
+        # cos_pct: the share of training posts whose caption and picture are less similar than this post's
         agreement.update(cos=round(cos, 4), cos_pct=round(float(np.searchsorted(sorted_cos, cos) / len(sorted_cos) * 100), 1))
     for name, reading in out["readings"].items():
         agreement[f"H_{name}"] = round(entropy(reading["proba"]), 3)

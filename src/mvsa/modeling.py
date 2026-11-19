@@ -1,4 +1,11 @@
-"""Data loading, classifiers, fusion setups, tuning and evaluation used by the modelling notebooks."""
+"""Data loading, classifiers, fusion setups, tuning and evaluation used by the modelling notebooks.
+
+The modelling notebooks start with `from mvsa.modeling import *`. Importing this module loads every split of
+the preprocessed features into D, so the notebooks can go straight to training. Sections:
+  1. settings and data loading          4. fusion setups and the agreement gate
+  2. classifier families and grids      5. hyperparameter tuning on the validation set
+  3. training helpers                   6. evaluation metrics
+"""
 import os, json, time, warnings
 import numpy as np
 import pandas as pd
@@ -15,13 +22,16 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, confusion_matrix, classification_report
 from sklearn.exceptions import ConvergenceWarning
+# The MLP and SVM sometimes stop at their iteration limit; the warning is noise because results are checked on
+# validation data anyway
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
+# ---- Settings and data loading
 QUICK    = os.environ.get("MVSA_QUICK", "0") == "1"   # True: 1 seed, for a fast test run
-SEEDS    = [0] if QUICK else [0, 1, 2, 3, 4]
+SEEDS    = [0] if QUICK else [0, 1, 2, 3, 4]           # every reported score is the mean over these seeds
 OUT_DIR  = os.environ.get("MVSA_MODEL_OUT", "/kaggle/working/models")
-LABELS   = ["negative", "neutral", "positive"]
-FAMILIES = ["logreg", "linear_svm", "random_forest", "mlp"]
+LABELS   = ["negative", "neutral", "positive"]         # class i is LABELS[i] in every array
+FAMILIES = ["logreg", "linear_svm", "random_forest", "mlp"]   # the four classifiers compared
 os.makedirs(OUT_DIR, exist_ok=True)
 
 def find_preprocessed(roots=("/kaggle/working", "/kaggle/input")):
@@ -36,8 +46,9 @@ def find_preprocessed(roots=("/kaggle/working", "/kaggle/input")):
 
 PRE = find_preprocessed()
 F = os.path.join(PRE, "features")
+# One row per post with its labels and agreement group; ids are read as text so "0012" keeps its zeros
 posts = pd.read_csv(os.path.join(PRE, "posts_preprocessed.csv"), dtype={"id": str}).set_index("id")
-META_COLS = json.load(open(os.path.join(F, "meta_columns.json")))
+META_COLS = json.load(open(os.path.join(F, "meta_columns.json")))   # names of the engineered meta features
 
 def load(split):
     """Load one split. Row i of every array belongs to the post on line i of <split>_ids.txt."""
@@ -45,11 +56,11 @@ def load(split):
     p = posts.loc[ids]
     return {
         "ids": ids,
-        "text":  np.load(os.path.join(F, f"{split}_clip_text.npy")),
-        "image": np.load(os.path.join(F, f"{split}_clip_image.npy")),
-        "meta":  np.load(os.path.join(F, f"{split}_meta.npy")),
-        "hist":  np.load(os.path.join(F, f"{split}_colorhist.npy")),
-        "tfidf": sparse.load_npz(os.path.join(F, f"{split}_tfidf.npz")),
+        "text":  np.load(os.path.join(F, f"{split}_clip_text.npy")),    # CLIP caption embeddings, 512 per post
+        "image": np.load(os.path.join(F, f"{split}_clip_image.npy")),   # CLIP image embeddings, 512 per post
+        "meta":  np.load(os.path.join(F, f"{split}_meta.npy")),         # engineered features (counts, ratios, flags)
+        "hist":  np.load(os.path.join(F, f"{split}_colorhist.npy")),    # colour histogram, for the baseline only
+        "tfidf": sparse.load_npz(os.path.join(F, f"{split}_tfidf.npz")),  # TF-IDF word counts, for the baseline
         "y":     p["label"].map({l: i for i, l in enumerate(LABELS)}).to_numpy(),   # NaN for 'hard'
         "group": p["mismatch_type"].to_numpy(),
         "text_label": p["text_label"].to_numpy(), "image_label": p["image_label"].to_numpy(),
@@ -58,8 +69,8 @@ def load(split):
 # "hard" holds the hard-mismatch posts: they have no single label, so they are never trained on
 D = {s: load(s) for s in ["train", "val", "test", "hard"]}
 for s in ["train", "val", "test"]:
-    D[s]["y"] = D[s]["y"].astype(int)
-ytr = D["train"]["y"]
+    D[s]["y"] = D[s]["y"].astype(int)   # these splits always have a label, so whole-number classes are safe
+ytr = D["train"]["y"]                   # shortcut for the training labels
 print(f"Loaded from {PRE}")
 for s, d in D.items():
     print(f"  {s:5s} {len(d['ids']):5d} posts | CLIP text {d['text'].shape[1]}-d, image {d['image'].shape[1]}-d")
@@ -95,10 +106,12 @@ def make_clf(family, seed, C=1.0, min_samples_leaf=1, alpha=1e-3):
                                            validation_fraction=0.15, max_iter=500, random_state=seed))
     raise ValueError(family)
 
+# ---- Training helpers
 def oversample(X, y, seed):
     """Repeat minority-class rows until every class is as large as the biggest (used for the MLP only)."""
     rng = np.random.default_rng(seed)
-    n = np.bincount(y).max()
+    n = np.bincount(y).max()                    # size of the largest class
+    # For each class, draw n row numbers with replacement, so small classes get repeated rows
     idx = np.concatenate([rng.choice(np.flatnonzero(y == c), n, replace=True) for c in np.unique(y)])
     return X[idx], y[idx]
 
@@ -111,6 +124,7 @@ def fit(family, hp, X, y, seed):
 def oof_proba(family, hp, X, y, seed, k=5):
     """Out-of-fold probabilities: each row is predicted by a model that never saw it (A5, point 1)."""
     P = np.zeros((len(y), len(LABELS)))
+    # Split into k folds; train on k-1 of them and predict the fold left out, so every row gets one prediction
     for tr, te in StratifiedKFold(k, shuffle=True, random_state=seed).split(X, y):
         P[te] = fit(family, hp, X[tr], y[tr], seed).predict_proba(X[te])
     return P
@@ -124,6 +138,7 @@ def features(d, kind):
             "early":      lambda: np.hstack([d["text"], d["image"]]),
             "early_meta": lambda: np.hstack([d["text"], d["image"], d["meta"]])}[kind]()
 
+# Names of the gate's 10 input columns, in order (used to label its coefficients in the analysis)
 GATE_COLS = ([f"p_text_{l}" for l in LABELS] + [f"p_image_{l}" for l in LABELS]
              + ["clip_cosine", "js_divergence", "conf_text", "conf_image"])
 
@@ -131,9 +146,11 @@ def gate_inputs(p_text, p_image, d):
     """Build the gate's 10 inputs: both sets of class probabilities plus 4 agreement signals."""
     cos = (d["text"] * d["image"]).sum(axis=1, keepdims=True)   # embeddings are unit length, so this is the cosine
     js  = np.nan_to_num(jensenshannon(p_text, p_image, axis=1, base=2))[:, None]   # 0 = agree, 1 = disagree
+    # Confidence of each model = its highest class probability
     return np.hstack([p_text, p_image, cos, js, p_text.max(1, keepdims=True), p_image.max(1, keepdims=True)])
 
 def make_gate(C):
+    """The gate itself: a logistic regression that learns how to combine the 10 inputs into one prediction."""
     return make_pipeline(StandardScaler(), LogisticRegression(C=C, class_weight="balanced", max_iter=5000))
 
 def macro_f1(y, P):
@@ -149,9 +166,10 @@ def build(family, cfg, seed, train=D["train"]):
     Pt = oof_proba(family, hp["text"],  train["text"],  train["y"], seed)
     Pv = oof_proba(family, hp["image"], train["image"], train["y"], seed)
     gate = make_gate(cfg["gate_C"]).fit(gate_inputs(Pt, Pv, train), train["y"])
-    w = cfg["late_w"]
-    pt = lambda d: m["text"].predict_proba(d["text"])
-    pv = lambda d: m["image"].predict_proba(d["image"])
+    w = cfg["late_w"]                                     # late-fusion weight on the text model, tuned on validation
+    pt = lambda d: m["text"].predict_proba(d["text"])     # text-only probabilities for any split d
+    pv = lambda d: m["image"].predict_proba(d["image"])   # image-only probabilities for any split d
+    # Each entry turns a split into class probabilities, so every setup is scored with the same code
     return {
         "text_only":  pt,
         "image_only": pv,
@@ -164,9 +182,14 @@ def build(family, cfg, seed, train=D["train"]):
 
 # ---- Hyperparameter tuning on the validation set
 def tune(family, seed=0, train=D["train"], val=D["val"]):
+    """Choose one family's settings by validation macro-F1: grid values, the late-fusion weight and the gate's C.
+
+    Every model is trained on the training split and scored on the validation split; the test split is never used.
+    """
     hp, scores = {}, {}
     # Step 1: best grid value for each input type
     for kind in ("text", "image", "early", "early_meta"):
+        # Train once per grid value and keep the one with the highest validation macro-F1
         best = max(GRIDS[family], key=lambda g: macro_f1(
             val["y"], fit(family, g, features(train, kind), train["y"], seed).predict_proba(features(val, kind))))
         hp[kind] = best
@@ -175,7 +198,8 @@ def tune(family, seed=0, train=D["train"], val=D["val"]):
     mv = fit(family, hp["image"], train["image"], train["y"], seed)
     pt, pv = mt.predict_proba(val["text"]), mv.predict_proba(val["image"])
     late_w = max(np.round(np.arange(0, 1.01, 0.1), 1), key=lambda w: macro_f1(val["y"], w * pt + (1 - w) * pv))
-    # Step 3: best regularisation strength for the gate
+    # Step 3: best regularisation strength for the gate. Its training inputs are out-of-fold probabilities,
+    # exactly as in build(); its validation inputs come from the models trained on all training posts
     Gtr = gate_inputs(oof_proba(family, hp["text"], train["text"], train["y"], seed),
                       oof_proba(family, hp["image"], train["image"], train["y"], seed), train)
     Gva = gate_inputs(pt, pv, val)
@@ -188,6 +212,7 @@ def evaluate(P, d):
     """Score the class probabilities P on one split, returning a dictionary of metrics."""
     pred = P.argmax(1)                                             # the predicted class is the most probable one
     if np.isnan(d["y"].astype(float)).all():                       # the 'hard' set
+        # Hard mismatches have no post label, so report which part's label the prediction agrees with instead
         lab = np.array(LABELS)[pred]
         return {"matches_text": (lab == d["text_label"]).mean(),
                 "matches_image": (lab == d["image_label"]).mean(),
