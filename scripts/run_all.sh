@@ -3,9 +3,11 @@
 # all generated files go to a separate folder (runs/ locally, /kaggle/working on Kaggle).
 #
 # Usage: MVSA_ROOT=/path/to/MVSA_Single bash scripts/run_all.sh
+# Stop at the first error, on unset variables, and on failures inside pipes
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Choose where the dataset is read from and where outputs go: Kaggle's folders, or ones in the repository
 if [ -d /kaggle/working ]; then
   RUNS="${MVSA_RUNS:-/kaggle/working}"
   export MVSA_ROOT="${MVSA_ROOT:-/kaggle/input}"
@@ -13,11 +15,13 @@ else
   RUNS="${MVSA_RUNS:-$REPO/runs}"
   export MVSA_ROOT="${MVSA_ROOT:-$REPO/data/raw}"
 fi
+# The notebooks read these variables, so every notebook writes to and reads from the same run folder
 export MVSA_OUT="$RUNS/preprocessed"
 export MVSA_PRE="$RUNS/preprocessed"
 export MVSA_MODEL_OUT="$RUNS/models"
 export MVSA_INTERIM="$RUNS/interim"
 
+# Execute each notebook in order; each one reads what the previous one saved
 for notebook in \
   01_preprocessing/01_data_cleaning_and_labels \
   01_preprocessing/02_train_val_test_split \

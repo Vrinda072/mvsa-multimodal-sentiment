@@ -71,6 +71,7 @@ def main():
     P = []
     for n, (tr, te) in enumerate(folds):
         p = {(k, C): clip_model(C).fit(x[tr], y[tr]).predict_proba(x[te]) for k, x in X.items() for C in CS}
+        # The TF-IDF word model keeps scikit-learn's default C = 1.0; only the CLIP models' C is searched
         p["tfidf"] = LogisticRegression(class_weight="balanced", max_iter=5000).fit(W[tr], y[tr]).predict_proba(W[te])
         P.append(p)
         print(f"fold {n + 1} of {len(folds)}", flush=True)
@@ -99,6 +100,7 @@ def main():
                             score(lambda p: w * p[("text", C)] + (1 - w) * p[("image", C)], n)))
         results.append(({"setup": "late_tfidf", "C": C, "neutral": n},
                         score(lambda p: (p[("text", C)] + p[("image", C)] + p["tfidf"]) / 3, n)))
+    # Best configuration first (the fixed rule: highest mean macro-F1)
     results.sort(key=lambda r: -r[1]["macro_f1"])
 
     print(f"\n{len(results)} configurations compared. Top 8:")

@@ -12,6 +12,7 @@ import argparse
 import os
 import sys
 
+# Make the mvsa package in src/ importable when this script is run directly
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from mvsa.predict import SentimentModel  # noqa: E402
@@ -22,18 +23,22 @@ def main():
     parser.add_argument("--text", help="the post's text")
     parser.add_argument("--image", help="path to the post's image")
     args = parser.parse_args()
+    # Check the inputs before loading CLIP, which is slow
     if args.image is None and (args.text is None or not args.text.strip()):
         parser.error("give a non-empty --text, an --image, or both")
     if args.image is not None and not os.path.isfile(args.image):
         parser.error(f"image not found: {args.image}")
 
+    # Load the saved model and predict
     result = SentimentModel().predict(args.text, args.image)
     print(f"Prediction: {result['label']}")
     print(f"Score:      {result['score']:.3f} ({result['confidence']} confidence)")
     print(f"Used:       {' and '.join(result['used'])}")
     print("All classes:")
+    # Every class, most likely first
     for label, probability in sorted(result["probabilities"].items(), key=lambda item: -item[1]):
         print(f"  {label:9s} {probability:.3f}")
+    # With both parts given, also show what the caption and the picture each say on their own
     if len(result["readings"]) == 2:
         print("What each part says on its own:")
         for name, reading in result["readings"].items():

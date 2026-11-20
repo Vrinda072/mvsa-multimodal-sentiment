@@ -336,13 +336,18 @@ table.std b { font-weight: 600; color: #222; }
 </div>
 
 <script>
+// Class names in model order, their short CSS keys, and the red/blue end colours of the value scale
 const C = ["negative", "neutral", "positive"], K = ["neg", "neu", "pos"];
 const NEG = [178, 24, 43], POS = [33, 102, 172];
 const $ = id => document.getElementById(id);
+// Number formatting: three decimals, and three decimals with an explicit sign
 const f3 = x => x.toFixed(3), sg = x => (x < 0 ? "−" : "+") + Math.abs(x).toFixed(3);
 const NS = "http://www.w3.org/2000/svg";
+// Create an SVG element with attributes and optional text, and append it to parent p
 function el(p, tag, a = {}, text) { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (text != null) e.textContent = text; p.append(e); return e; }
+// Escape text before inserting it as HTML, so a caption cannot inject markup
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// Respect the visitor's reduced-motion setting: animations are skipped
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const touch = matchMedia("(hover: none)").matches;
 const net = $("net");
@@ -367,14 +372,17 @@ function heat(canvas, v, mark = []) {
   ctx.strokeStyle = "#222"; ctx.lineWidth = Math.max(1, w / 7);
   mark.forEach(i => ctx.strokeRect((i % 32) * w + ctx.lineWidth / 2, Math.floor(i / 32) * w + ctx.lineWidth / 2, w - ctx.lineWidth, w - ctx.lineWidth));
 }
+// Draw three probability cells; darker = more probable, and the winning class is in bold
 function cells(id, p) {
   if (!p) { $(id).innerHTML = K.map(k => `<span class="cell k-${k}">–</span>`).join(""); return; }
   const best = p.indexOf(Math.max(...p));
   $(id).innerHTML = p.map((v, i) => { const a = (0.04 + 0.46 * v).toFixed(3);
     return `<span class="cell k-${K[i]}${i === best ? " best" : ""}" style="background:linear-gradient(rgba(40,40,40,${a}),rgba(40,40,40,${a})),#fff" title="${C[i]} ${f3(v)}">${f3(v)}</span>`; }).join("");
 }
+// Same confidence cut-offs as src/mvsa/predict.py
 const level = x => x >= 0.70 ? "high" : x >= 0.45 ? "medium" : "low";
 const RATE = { high: "95%", medium: "72%", low: "52%" };   // how often each level was right on validation posts
+// The diagram box for one step, by its key
 const nodeOf = k => net.querySelector(`[data-k="${k}"]`);
 $("ramp").style.background = `linear-gradient(90deg, rgb(${NEG}), #fafafa, rgb(${POS}))`;
 $("ramp2").style.background = "linear-gradient(90deg, rgba(40,40,40,.04), rgba(40,40,40,.5))";
@@ -385,6 +393,7 @@ const NEEDS = { "in-pic": "a picture", "enc-image": "a picture", "lr-image": "a 
   "enc-words": "a caption", "lr-words": "a caption", mean: "both a picture and a caption", scale: "both a picture and a caption" };
 const NAMES = { "in-pic": "The picture", "in-cap": "The caption", "enc-image": "CLIP image embedding", "enc-text": "CLIP text embedding", "enc-words": "TF-IDF word features",
   "lr-image": "Picture model", "lr-text": "Caption model", "lr-words": "Word model", mean: "Late fusion: the mean of three", scale: "Rescaling neutral", out: "The prediction" };
+// Whether a step has something to show for the current input (e.g. no picture means no picture model)
 function avail(k) {
   if (!D) return false;
   return { "in-pic": !!picture, "in-cap": !!D.caption, "enc-image": !!B.image, "lr-image": !!B.image, "enc-text": !!B.text, "lr-text": !!B.text,
@@ -421,6 +430,7 @@ function render(d) {
     + (netPush.at(-1)[1] < 0 ? `, and the strongest towards negative from "${netPush.at(-1)[0]}" (${sg(netPush.at(-1)[1])}).` : ". No term in this caption pushes towards negative.");
   trace(null); open(sel, false); drawPlots(); figures(); wires();
 }
+// Show the predicted class, its confidence and one bar per class; hovering a class traces it through the diagram
 function showOutput(p, confText) {
   const w = p.indexOf(Math.max(...p)), lab = C[w];
   $("verdict").textContent = lab[0].toUpperCase() + lab.slice(1);
@@ -432,6 +442,7 @@ function showOutput(p, confText) {
     r.addEventListener("click", e => { if (touch) { e.stopPropagation(); trace(net.dataset.cls === r.dataset.cls ? null : r.dataset.cls); } });
   });
 }
+// Grey out the result after the input changes, until Predict is pressed again
 function markStale(stale) {
   nodeOf("out").classList.toggle("stale", stale); $("result").classList.toggle("stale", stale);
   $("outnote").hidden = !stale; if (stale) $("outnote").textContent = "From the previous input. Press Predict sentiment to update.";
@@ -450,6 +461,7 @@ const LINKS = [["in-pic", "enc-image"], ["in-cap", "enc-text"], ["in-cap", "enc-
 const COLOF = { "enc-image": 1, "enc-text": 1, "enc-words": 1, "lr-image": 2, "lr-text": 2, "lr-words": 2, mean: 3, scale: 4, out: 5 };
 // Narrow windows keep the whole diagram in view by scaling it, as a zoomed-out page would
 function fit() { zf = innerWidth >= 700 ? Math.min(1, (innerWidth - 40) / 1320) : 1; net.style.zoom = zf; net.style.width = zf < 1 ? "1320px" : ""; }
+// Draw the connectors between diagram columns, measured from where the boxes are on screen
 function wires() {
   const svg = $("wires"); if (getComputedStyle(svg).display === "none") return;
   const box = net.getBoundingClientRect(); svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`); svg.style.width = box.width / zf + "px"; svg.style.height = box.height / zf + "px";
@@ -476,6 +488,7 @@ function wires() {
 // ---------- Detail: each step worked through ----------
 function pushCell(v, m) { const w = Math.min(1, Math.abs(v) / m) * 100;
   return `<td><span class="push"><span class="l grow" style="width:${v < 0 ? w : 0}%;background:var(--neg)"></span><span class="r grow" style="width:${v > 0 ? w : 0}%;background:var(--pos)"></span></span></td>`; }
+// Detail view for one logistic regression: the strongest dimensions, their pushes, the scores and softmax
 function lrDetail(key, name, enc) {
   const b = B[key], m = Math.max(...b.top.flatMap(t => t.push.map(Math.abs)));
   const rows = b.top.map(t => `<tr class="reveal"><td>dimension ${t.dim} <span class="muted">(${t.z < 0 ? "−" : "+"}${Math.abs(t.z).toFixed(2)})</span></td>${t.push.map(v => `<td>${sg(v)}</td>`).join("")}${pushCell(t.push[2] - t.push[0], m)}</tr>`).join("");
@@ -487,6 +500,7 @@ function lrDetail(key, name, enc) {
       <tr class="total reveal"><td>score z</td>${b.logits.map(v => `<td>${sg(v)}</td>`).join("")}<td></td></tr>
       <tr class="total reveal"><td>softmax p</td>${b.proba.map(v => `<td>${f3(v)}</td>`).join("")}<td></td></tr></tbody></table></div>` };
 }
+// Detail view for one embedding, drawn as a 32 x 16 heat map of its 512 values
 function encDetail(key, title, text) {
   return { title, text: `<p>${text}</p><p class="readout" id="readout">Point at a cell to read its value.</p>`, side: `<canvas class="bigheat" id="bigheat" width="${32 * 21}" height="${16 * 21}" data-key="${key}"></canvas>` };
 }
@@ -517,10 +531,12 @@ const DETAIL = {
   "out": () => ({ title: "The prediction", text: `<p>The class with the highest probability wins, and its probability is the score. The confidence level says how often predictions with a similar score were right on 446 validation posts: about 95% at high (0.70 or more), 72% at medium, and about half at low (below 0.45).</p>`,
     side: `<table class="calc"><tbody><tr><td>winning class</td><td>${D.label}</td></tr><tr><td>score</td><td>${f3(D.score)}</td></tr><tr><td>confidence</td><td>${D.confidence}</td></tr>${R.text ? `<tr><td>caption on its own</td><td>${R.text.label} ${f3(Math.max(...R.text.proba))}</td></tr>` : ""}${R.image ? `<tr><td>picture on its own</td><td>${R.image.label} ${f3(Math.max(...R.image.proba))}</td></tr>` : ""}</tbody></table>` }),
 };
+// Copy each table's column headings onto its cells, so narrow screens can show them stacked
 function labelTables(root = document) {
   root.querySelectorAll("table").forEach(t => { const h = [...t.querySelectorAll("thead th")].map(x => x.textContent);
     t.querySelectorAll("tbody tr").forEach(r => [...r.children].forEach((td, i) => { if (h[i]) td.dataset.label = h[i]; })); });
 }
+// Open the worked example for step k under the diagram
 function open(k, scroll) {
   sel = k;
   document.querySelectorAll(".node").forEach(n => n.classList.toggle("sel", n.dataset.k === k));
@@ -535,6 +551,7 @@ function open(k, scroll) {
   labelTables(box); play(); wires();
   if (scroll) box.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest" });
 }
+// Replay the detail view's reveal animation, staggering rows and bars
 function play() {
   const body = document.querySelector(".detail .body"); if (!body) return;
   $("replay").onclick = play;
@@ -562,6 +579,7 @@ function barsFig(id, steps) {
     dots.forEach((d, i) => d.classList.toggle("on", i === k)); };
   show(); if (!reduce) timers.push(setInterval(() => { k = (k + 1) % steps.length; show(); }, 1700));
 }
+// Start the looping animated figures in the explanation section
 function figures() {
   timers.forEach(clearInterval); timers = [];
   const note = (id, text) => { $(id).classList.remove("div"); $(id).innerHTML = `<div class="fstep" style="font-weight:400;color:var(--mute);margin:0">${text}</div>`; };
@@ -664,6 +682,7 @@ function drawCM() {
       el(s, "text", { x: L + j * c + c / 2 - 1, y: T + i * c + c / 2 + 2, "text-anchor": "middle", "font-weight": 600, "font-size": 20, style: dark ? "fill:#fff" : "" }, v);
       el(s, "text", { x: L + j * c + c / 2 - 1, y: T + i * c + c / 2 + 22, "text-anchor": "middle", style: dark ? "fill:#fff" : "", class: dark ? "" : "muted" }, (sh * 100).toFixed(0) + "%"); }); });
 }
+// Redraw every chart in the explanation section
 function drawPlots() {
   if ($("description").clientWidth < 100) return;   // the page isn't laid out yet (a hidden tab); the observer below redraws
   drawCM(); if (D) { drawHist(); drawMaps(); drawWords(); }
@@ -671,6 +690,7 @@ function drawPlots() {
 
 // ---------- Predict: ask the server, then draw the chain left to right ----------
 const COLS = [[], ["enc-image", "enc-text", "enc-words"], ["lr-image", "lr-text", "lr-words"], ["mean"], ["scale"], ["out"]];
+// Animate the diagram column by column after a prediction
 function draw() {
   if (reduce) return;
   COLS.flat().forEach(k => { const n = nodeOf(k); n.classList.add("step"); n.style.setProperty("--d", (COLS.findIndex(c => c.includes(k)) * 220) + "ms"); });
@@ -680,7 +700,9 @@ function draw() {
   void net.offsetWidth;   // commit the hidden starting state before animating
   net.classList.remove("drawing"); net.classList.add("drawn");
 }
+// Show a message under the inputs; errors are shown in bold
 function status(text, error) { $("status").textContent = text || ""; $("status").classList.toggle("err", !!error); }
+// Call the local server: GET when there is no body, POST with JSON otherwise. Errors become readable messages
 async function ask(path, body) {
   let response;
   try { response = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined); }
@@ -689,6 +711,7 @@ async function ask(path, body) {
   if (!response.ok) throw new Error(answer.error || "Something went wrong. Please try again.");
   return answer;
 }
+// Send the caption and picture to the server, then draw the explained prediction
 async function predict() {
   const text = $("caption").value.trim();
   if (!text && !picture) return status("Add a picture, a caption, or both.", true);
@@ -715,6 +738,7 @@ function showPicture() {
 $("pic").addEventListener("error", () => { $("pic").hidden = true; $("empty").hidden = false; $("thumb").style.visibility = "hidden";
   $("empty").textContent = picture && picture.kind === "example" ? "the example picture needs an internet connection" : "this picture can't be shown"; wires(); });
 $("pic").addEventListener("load", wires);
+// Check a chosen picture's type and size, then read it as a data URL to send with the next prediction
 function usePicture(file) {
   if (!file) return;
   if (!file.type.startsWith("image/")) return status("That file isn't a picture. Please use a JPG or PNG.", true);
